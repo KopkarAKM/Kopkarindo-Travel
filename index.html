@@ -2,7 +2,8 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PERBAIKAN: Menambahkan maximum-scale dan user-scalable=no agar pas di HP -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Kopkarindo Travel & PPOB</title>
     
     <!-- Tailwind CSS (Styling) -->
@@ -19,6 +20,20 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
+        /* PERBAIKAN: Memastikan body tidak overflow dan full width */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden; /* Mencegah geser samping */
+            -webkit-tap-highlight-color: transparent; /* Hilangkan highlight biru saat tap di Android */
+        }
+        #root {
+            width: 100%;
+            min-height: 100%;
+        }
+
         /* Animasi Kustom */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -207,10 +222,11 @@
 
             // --- Render Tampilan ---
             return (
-                <div className="flex flex-col items-center justify-center min-h-screen p-4 relative overflow-hidden">
+                /* PERBAIKAN: w-full untuk memastikan container lebar penuh, justify-center dihapus di mobile (bisa pakai min-h-screen items-center saja) */
+                <div className="flex flex-col items-center min-h-screen w-full p-4 relative overflow-hidden">
                     <BackgroundDecor />
 
-                    <div className="w-full max-w-md bg-white shadow-2xl rounded-xl overflow-hidden border border-gray-200 relative min-h-[600px] flex flex-col z-10">
+                    <div className="w-full max-w-md bg-white shadow-2xl rounded-xl overflow-hidden border border-gray-200 relative min-h-[600px] flex flex-col z-10 my-auto">
                         <CardWatermark />
 
                         {/* VIEW 1: FLYER UTAMA */}
