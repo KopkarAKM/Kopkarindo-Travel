@@ -49,17 +49,18 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, memo } = React;
 
         // --- Helper Komponen Ikon ---
-        const Icon = ({ name, size = 24, className = "" }) => {
+        // Menggunakan memo agar ikon tidak dirender ulang jika props tidak berubah
+        const Icon = memo(({ name, size = 24, className = "" }) => {
             useEffect(() => {
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
             });
             return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
-        };
+        });
 
         // Mapping Ikon
         const Plane = (p) => <Icon name="plane" {...p} />;
@@ -85,6 +86,33 @@
         const Ticket = (p) => <Icon name="ticket" {...p} />;
         const Briefcase = (p) => <Icon name="briefcase" {...p} />;
         const Calculator = (p) => <Icon name="calculator" {...p} />;
+
+        // --- Background Decor (DIPINDAHKAN KELUAR AGAR TIDAK RE-RENDER BERAT) ---
+        // Menggunakan memo untuk mencegah render ulang yang tidak perlu
+        const BackgroundDecor = memo(() => (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[5%] left-[5%] text-blue-200 opacity-20 -rotate-12"><Plane size={96} /></div>
+                <div className="absolute top-[15%] right-[10%] text-red-200 opacity-20 rotate-12"><MapPin size={64} /></div>
+                <div className="absolute bottom-[20%] left-[8%] text-yellow-200 opacity-20 -rotate-6"><Bus size={80} /></div>
+                <div className="absolute bottom-[10%] right-[5%] text-purple-200 opacity-20 rotate-45"><Ticket size={96} /></div>
+                <div className="absolute top-[40%] left-[2%] text-yellow-400 opacity-10"><Zap size={48} /></div>
+                <div className="absolute top-[50%] right-[2%] text-blue-400 opacity-10"><Droplets size={48} /></div>
+                <div className="absolute bottom-[40%] left-[15%] text-green-400 opacity-10"><Wifi size={40} /></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-700"></div>
+            </div>
+        ));
+
+        // --- Watermark Kartu (DIPINDAHKAN KELUAR) ---
+        const CardWatermark = memo(() => (
+            <div className="absolute inset-0 z-0 opacity-[0.03] overflow-hidden pointer-events-none flex flex-wrap content-start gap-8 p-4 justify-center">
+                {[...Array(12)].map((_, i) => (
+                    <div key={i} className="flex gap-8">
+                        <Plane size={32} /><Zap size={32} /><Hotel size={32} /><Droplets size={32} /><Briefcase size={32} />
+                    </div>
+                ))}
+            </div>
+        ));
 
         // --- KOMPONEN UTAMA ---
         function FlyerKopkrindo() {
@@ -137,31 +165,6 @@
                 return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
             };
 
-            // --- Background Decor ---
-            const BackgroundDecor = () => (
-                <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                    <div className="absolute top-[5%] left-[5%] text-blue-200 opacity-20 -rotate-12"><Plane size={96} /></div>
-                    <div className="absolute top-[15%] right-[10%] text-red-200 opacity-20 rotate-12"><MapPin size={64} /></div>
-                    <div className="absolute bottom-[20%] left-[8%] text-yellow-200 opacity-20 -rotate-6"><Bus size={80} /></div>
-                    <div className="absolute bottom-[10%] right-[5%] text-purple-200 opacity-20 rotate-45"><Ticket size={96} /></div>
-                    <div className="absolute top-[40%] left-[2%] text-yellow-400 opacity-10"><Zap size={48} /></div>
-                    <div className="absolute top-[50%] right-[2%] text-blue-400 opacity-10"><Droplets size={48} /></div>
-                    <div className="absolute bottom-[40%] left-[15%] text-green-400 opacity-10"><Wifi size={40} /></div>
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-700"></div>
-                </div>
-            );
-
-            const CardWatermark = () => (
-                <div className="absolute inset-0 z-0 opacity-[0.03] overflow-hidden pointer-events-none flex flex-wrap content-start gap-8 p-4 justify-center">
-                    {[...Array(12)].map((_, i) => (
-                        <div key={i} className="flex gap-8">
-                            <Plane size={32} /><Zap size={32} /><Hotel size={32} /><Droplets size={32} /><Briefcase size={32} />
-                        </div>
-                    ))}
-                </div>
-            );
-
             // --- Fungsi Logika ---
             const generateItinerary = async () => {
                 if (!days) return;
@@ -169,7 +172,15 @@
                 setResult('');
 
                 const apiKey = ""; // API Key 
-                const prompt = `Bertindaklah sebagai staf ahli "Kopkarindo Travel"... (Prompt dipendekkan untuk kode)`;
+                const prompt = `Bertindaklah sebagai staf ahli "Kopkarindo Travel".
+User ingin pergi ke: ${destination ? destination : "Rekomendasikan 1 destinasi wisata domestik terbaik untuk keluarga dari Kalimantan Selatan"}.
+Durasi: ${days} hari. Budget: ${budget}.
+Berikan:
+1. Tujuan & Durasi
+2. Rencana Perjalanan Harian (Singkat)
+3. Estimasi Biaya (Tiket Pesawat, Hotel, dll)
+4. Simulasi Kopkarindo (Total Biaya + Jasa 5%, Tenor 12/24 bulan, Angsuran per bulan).
+`;
 
                 try {
                     let text = "";
@@ -222,7 +233,7 @@
 
             // --- Render Tampilan ---
             return (
-                /* PERBAIKAN: w-full untuk memastikan container lebar penuh, justify-center dihapus di mobile (bisa pakai min-h-screen items-center saja) */
+                /* PERBAIKAN: w-full untuk memastikan container lebar penuh */
                 <div className="flex flex-col items-center min-h-screen w-full p-4 relative overflow-hidden">
                     <BackgroundDecor />
 
