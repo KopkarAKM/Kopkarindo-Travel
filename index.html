@@ -1,0 +1,626 @@
+import React, { useState } from 'react';
+import { Plane, Hotel, CreditCard, Phone, MapPin, Instagram, Wallet, Bus, CalendarClock, AlertCircle, Sparkles, Send, ArrowLeft, Loader2, User, FileBadge, Zap, Wifi, Droplets, Smartphone, Ticket, Briefcase } from 'lucide-react';
+
+export default function FlyerKopkrindo() {
+  const [view, setView] = useState<'flyer' | 'planner' | 'payment' | 'booking'>('flyer');
+
+  // State untuk Data Karyawan (Shared)
+  const [name, setName] = useState('');
+  const [nik, setNik] = useState('');
+  const [kopkarId, setKopkarId] = useState('');
+
+  // State untuk AI Planner
+  const [destination, setDestination] = useState('');
+  const [days, setDays] = useState('');
+  const [budget, setBudget] = useState('');
+  const [result, setResult] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // State untuk Pembayaran PPOB
+  const [billType, setBillType] = useState('Listrik'); 
+  const [billNumber, setBillNumber] = useState('');
+
+  // State untuk Booking Tiket/Hotel
+  const [bookingType, setBookingType] = useState('Pesawat'); // Pesawat, Hotel, Kereta
+  const [bookingDetails, setBookingDetails] = useState('');
+
+  // --- KOMPONEN PATTERN BACKGROUND (Hiasan Luar) ---
+  const BackgroundDecor = () => (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      {/* Elemen Dekoratif Travel */}
+      <Plane className="absolute top-[5%] left-[5%] text-blue-200 opacity-20 w-24 h-24 -rotate-12" />
+      <MapPin className="absolute top-[15%] right-[10%] text-red-200 opacity-20 w-16 h-16 rotate-12" />
+      <Bus className="absolute bottom-[20%] left-[8%] text-yellow-200 opacity-20 w-20 h-20 -rotate-6" />
+      <Ticket className="absolute bottom-[10%] right-[5%] text-purple-200 opacity-20 w-24 h-24 rotate-45" />
+      
+      {/* Elemen Dekoratif Pembayaran */}
+      <Zap className="absolute top-[40%] left-[2%] text-yellow-400 opacity-10 w-12 h-12" />
+      <Droplets className="absolute top-[50%] right-[2%] text-blue-400 opacity-10 w-12 h-12" />
+      <Wifi className="absolute bottom-[40%] left-[15%] text-green-400 opacity-10 w-10 h-10" />
+      
+      {/* Lingkaran Bias Cahaya */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-700"></div>
+    </div>
+  );
+
+  // --- KOMPONEN WATERMARK KARTU (Pattern Dalam) ---
+  const CardWatermark = () => (
+    <div className="absolute inset-0 z-0 opacity-[0.03] overflow-hidden pointer-events-none flex flex-wrap content-start gap-8 p-4 justify-center">
+       {/* Mengulang ikon untuk membentuk tekstur */}
+       {[...Array(20)].map((_, i) => (
+          <React.Fragment key={i}>
+            <Plane size={32} />
+            <Zap size={32} />
+            <Hotel size={32} />
+            <Droplets size={32} />
+            <Briefcase size={32} />
+          </React.Fragment>
+       ))}
+    </div>
+  );
+
+  // Fungsi memanggil Gemini API
+  const generateItinerary = async () => {
+    if (!days) return;
+    setLoading(true);
+    setResult('');
+
+    const apiKey = ""; // API Key disuntikkan oleh sistem runtime
+    const prompt = `
+      Bertindaklah sebagai staf ahli "Kopkarindo Travel".
+      Tugasmu adalah membuatkan rencana perjalanan singkat dan simulasi pembiayaan koperasi.
+      
+      User ingin pergi ke: ${destination ? destination : "Rekomendasikan 1 destinasi wisata domestik terbaik untuk keluarga dari Kalimantan Selatan"}.
+      Durasi: ${days} hari.
+      Budget Preferensi: ${budget ? budget : "Standar/Menengah"}.
+
+      Lakukan kalkulasi berikut secara ketat:
+      1. Tentukan tujuan dan rencana perjalanan harian.
+      2. Hitung Estimasi Total Biaya (Tiket Pesawat PP, Hotel, Makan, Transport).
+      3. Tentukan Tenor Cicilan berdasarkan aturan:
+         - JIKA Total Biaya <= Rp 10.000.000, MAKA Tenor = 12 Bulan.
+         - JIKA Total Biaya > Rp 10.000.000, MAKA Tenor = 24 Bulan.
+      4. Hitung Total Pinjaman & Angsuran:
+         - Fee Jasa Koperasi = 5% dari Total Biaya (Flat).
+         - Total Pinjaman = Total Biaya + Fee Jasa.
+         - Angsuran Per Bulan = Total Pinjaman / Tenor.
+
+      Berikan respon dalam format berikut (Bahasa Indonesia santai profesional):
+      1. **Tujuan & Durasi**
+      2. **Rencana Perjalanan Harian** (Poin-poin singkat).
+      3. **Estimasi Biaya Perjalanan** (Rincian kasar & Total Biaya Murni).
+      4. **Simulasi Cicilan Kopkarindo**:
+         "Biaya perjalanan Rp[Total Biaya] ditambah Jasa Fee 5% (Rp[Nilai Fee]).
+          Total Pinjaman: Rp[Total Pinjaman].
+          Tenor: [12/24] Bulan.
+          **Angsuran: Rp[Angsuran] /bulan**."
+      
+      Jangan gunakan markdown bold berlebihan.
+    `;
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, gagal memuat rekomendasi. Silakan coba lagi.";
+      setResult(text);
+    } catch (error) {
+      setResult("Terjadi kesalahan koneksi. Pastikan internet lancar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fungsi Kirim WA untuk Travel (AI)
+  const sendTravelToWA = () => {
+    if (!name || !nik) {
+      alert("Mohon lengkapi Nama dan NIK Anda sebelum mengirim pesan.");
+      return;
+    }
+    const message = `Halo Admin Kopkarindo Travel 👋\n\nSaya ingin mengajukan pinjaman perjalanan wisata dengan detail:\n\n📋 *DATA KARYAWAN*\nNama: ${name}\nNIK: ${nik}\nNo Anggota: ${kopkarId || '-'}\n\n✈️ *RENCANA & SIMULASI (Rek. AI)*\n--------------------------------\n${result}\n--------------------------------\n\nMohon verifikasi dan proses pengajuannya. Terima kasih.`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/6285248626532?text=${encodedMessage}`, '_blank');
+  };
+
+  // Fungsi Kirim WA untuk PPOB (Tagihan)
+  const sendBillToWA = () => {
+    if (!name || !nik || !billNumber) {
+      alert("Mohon lengkapi Nama, NIK, dan Nomor Tagihan.");
+      return;
+    }
+    const message = `Halo Admin Kopkarindo 👋\n\nSaya ingin mengajukan pembayaran tagihan bulanan (Potong Gaji/Koperasi).\n\n📋 *DATA KARYAWAN*\nNama: ${name}\nNIK: ${nik}\nNo Anggota: ${kopkarId || '-'}\n\n⚡ *DETAIL TAGIHAN*\nJenis: ${billType}\nNomor ID/Pelanggan: ${billNumber}\n\nMohon diproses segera. Terima kasih.`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/6285248626532?text=${encodedMessage}`, '_blank');
+  }
+
+  // Fungsi Kirim WA untuk Booking Manual (Tiket/Hotel)
+  const sendBookingToWA = () => {
+    if (!name || !nik || !bookingDetails) {
+      alert("Mohon lengkapi Nama, NIK, dan Detail Pesanan.");
+      return;
+    }
+    const message = `Halo Admin Kopkarindo Travel 👋\n\nSaya ingin memesan Tiket/Hotel dengan rincian:\n\n📋 *DATA PEMESAN*\nNama: ${name}\nNIK: ${nik}\nNo Anggota: ${kopkarId || '-'}\n\n🎫 *DETAIL BOOKING*\nKategori: ${bookingType}\nDetail: ${bookingDetails}\n\nSaya menyetujui *Biaya Jasa Pemesanan sebesar 2%*.\nMohon info harga dan ketersediaan. Terima kasih.`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/6285248626532?text=${encodedMessage}`, '_blank');
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100 p-4 font-sans relative overflow-hidden">
+      
+      {/* Background Decor Layer (Luar) */}
+      <BackgroundDecor />
+
+      {/* Container Utama */}
+      <div className="w-full max-w-md bg-white shadow-2xl rounded-xl overflow-hidden border border-gray-200 relative min-h-[600px] flex flex-col z-10">
+        
+        {/* Background Pattern Layer (Dalam Kartu) */}
+        <CardWatermark />
+
+        {/* TAMPILAN 1: FLYER UTAMA */}
+        {view === 'flyer' && (
+          <div className="flex-1 flex flex-col animate-fadeIn relative z-10">
+            {/* Header Section */}
+            <div className="bg-blue-900 p-6 text-white text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-yellow-400 via-blue-900 to-black"></div>
+              
+              <div className="relative z-10 flex justify-center mb-4">
+                <img 
+                  src="https://i.ibb.co.com/8Df6kd0M/Untitled-design-1.png" 
+                  alt="Logo Kopkarindo Travel" 
+                  className="w-24 h-auto object-contain drop-shadow-lg"
+                />
+              </div>
+
+              {/* HEADER DIPERBARUI: Lebih Menyeluruh */}
+              <div className="relative z-10 inline-block bg-yellow-500 text-blue-900 px-3 py-1 rounded-full text-[10px] font-bold mb-2 animate-pulse">
+                SOLUSI DIGITAL ANGGOTA
+              </div>
+
+              <h1 className="text-2xl font-extrabold leading-tight mb-2 relative z-10">
+                Liburan Puas, <br/> Tagihan Tuntas!
+              </h1>
+              
+              <p className="text-blue-100 text-[10px] relative z-10 px-4 mt-1">
+                Satu aplikasi untuk Travel, Hotel, & Pembayaran PPOB.
+              </p>
+            </div>
+
+            {/* Pain Point Alert */}
+            <div className="bg-red-50 p-3 flex items-start space-x-2 border-b border-red-100 relative z-20">
+               <AlertCircle className="text-red-600 min-w-[16px]" size={16} />
+               <p className="text-red-800 text-[10px] leading-relaxed">
+                 <strong>Info Akhir Tahun:</strong> Kuota tiket & hotel Desember menipis. Amankan rencana liburan Anda segera!
+               </p>
+            </div>
+
+            {/* Feature List */}
+            <div className="p-4 bg-white/80 backdrop-blur-sm flex-1 relative z-10">
+              <div className="grid grid-cols-1 gap-3">
+                 {/* Booking Manual Ticket/Hotel */}
+                 <div 
+                    onClick={() => setView('booking')}
+                    className="flex items-center p-2 bg-indigo-50/90 rounded-lg border border-indigo-100 cursor-pointer hover:bg-indigo-100 transition-colors group shadow-sm"
+                 >
+                    <div className="bg-indigo-100 p-2 rounded-full mr-3 group-hover:bg-white transition-colors">
+                        <Ticket size={18} className="text-indigo-600" />
+                    </div>
+                    <div className="text-xs flex-1">
+                        <span className="font-bold text-gray-800 block flex items-center justify-between">
+                            Tiket & Hotel
+                            <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.5 rounded-full">Baru</span>
+                        </span>
+                        <span className="text-gray-500">Pesan Langsung (Fee Jasa 2%)</span>
+                    </div>
+                 </div>
+
+                 {/* PPOB Clickable Card */}
+                 <div 
+                    onClick={() => setView('payment')}
+                    className="flex items-center p-2 bg-green-50/90 rounded-lg border border-green-100 cursor-pointer hover:bg-green-100 transition-colors group shadow-sm"
+                 >
+                    <div className="bg-green-100 p-2 rounded-full mr-3 group-hover:bg-white transition-colors">
+                        <Zap size={18} className="text-green-600" />
+                    </div>
+                    <div className="text-xs flex-1">
+                        <span className="font-bold text-gray-800 block flex items-center justify-between">
+                            Bayar Tagihan & Pulsa
+                            <span className="bg-green-600 text-white text-[9px] px-1.5 py-0.5 rounded-full">Klik Disini</span>
+                        </span>
+                        <span className="text-gray-500">Indihome, PDAM, Listrik (Jasa 1.5%)</span>
+                    </div>
+                 </div>
+              </div>
+            </div>
+
+            {/* AI Call to Action Box */}
+            <div className="mx-4 mb-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-4 text-white shadow-lg relative overflow-hidden group cursor-pointer z-10" onClick={() => setView('planner')}>
+                <div className="absolute top-0 right-0 p-2 opacity-20">
+                    <Sparkles size={60} />
+                </div>
+                <div className="relative z-10">
+                    <h3 className="font-bold text-sm flex items-center gap-2">
+                        <Sparkles size={16} className="text-yellow-300" />
+                        Bingung Mau Kemana?
+                    </h3>
+                    <p className="text-[11px] text-purple-100 mt-1 mb-3">
+                        Gunakan fitur <strong>Smart Planner</strong>. Kami buatkan itinerary & hitung biayanya otomatis!
+                    </p>
+                    <button className="bg-white text-purple-700 text-xs font-bold py-2 px-4 rounded-full shadow hover:bg-gray-100 transition-colors w-full">
+                        Coba Rencanakan Sekarang
+                    </button>
+                </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="bg-gray-900 p-4 mt-auto relative z-10">
+              <button 
+                onClick={() => window.open('https://wa.me/6285248626532', '_blank')}
+                className="w-full bg-yellow-500 text-blue-900 font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center space-x-2 text-sm"
+              >
+                <Phone size={18} />
+                <span>Chat WA: 0852-4862-6532</span>
+              </button>
+              
+              <button 
+                onClick={() => window.open('https://www.instagram.com/kopkarindotravel', '_blank')}
+                className="w-full mt-3 bg-transparent border border-gray-600 hover:bg-gray-800 text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center space-x-2 transition-all cursor-pointer"
+              >
+                <Instagram size={18} />
+                <span>@kopkarindotravel</span>
+              </button>
+              
+              <p className="text-gray-500 text-[10px] mt-4 text-center">© 2024 Kopkarindo Travel Unit Usaha Koperasi</p>
+            </div>
+          </div>
+        )}
+
+        {/* TAMPILAN 2: AI PLANNER (TRAVEL) */}
+        {view === 'planner' && (
+           <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
+              {/* Header Planner */}
+              <div className="bg-purple-700 p-4 text-white flex items-center shadow-md">
+                 <button onClick={() => setView('flyer')} className="mr-3 hover:bg-purple-600 p-1 rounded-full">
+                    <ArrowLeft size={20} />
+                 </button>
+                 <div>
+                    <h2 className="font-bold text-sm">Asisten Kopkarindo</h2>
+                    <p className="text-[10px] text-purple-200">Rencanakan liburan & hitung budget</p>
+                 </div>
+              </div>
+
+              {/* Form Input Container */}
+              <div className="p-4 space-y-3 overflow-y-auto">
+                 
+                 {/* BAGIAN DATA DIRI */}
+                 <div className="bg-white p-3 rounded-lg border border-purple-100 shadow-sm space-y-2">
+                    <div className="flex items-center gap-2 text-purple-800 mb-1">
+                        <User size={14} />
+                        <h3 className="text-xs font-bold">Data Karyawan</h3>
+                    </div>
+                    <input 
+                        type="text" 
+                        placeholder="Nama Lengkap Karyawan" 
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
+                    />
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="NIK" 
+                            value={nik}
+                            onChange={(e) => setNik(e.target.value)}
+                            className="flex-1 p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
+                        />
+                        <input 
+                            type="text" 
+                            placeholder="No. Anggota (Opsional)" 
+                            value={kopkarId}
+                            onChange={(e) => setKopkarId(e.target.value)}
+                            className="flex-1 p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
+                        />
+                    </div>
+                 </div>
+
+                 {/* BAGIAN RENCANA LIBURAN */}
+                 <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm space-y-2">
+                     <div className="flex items-center gap-2 text-gray-700 mb-1">
+                        <MapPin size={14} />
+                        <h3 className="text-xs font-bold">Rencana Liburan</h3>
+                    </div>
+                    <div>
+                        <input 
+                            type="text" 
+                            placeholder="Tujuan (Contoh: Bali / Jogja)" 
+                            value={destination}
+                            onChange={(e) => setDestination(e.target.value)}
+                            className="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
+                        />
+                     </div>
+                     <div className="flex gap-2">
+                         <div className="flex-1">
+                            <select 
+                                value={days} 
+                                onChange={(e) => setDays(e.target.value)}
+                                className="w-full p-2 text-xs border border-gray-300 rounded outline-none bg-white"
+                            >
+                                <option value="">Durasi...</option>
+                                <option value="3">3 Hari</option>
+                                <option value="4">4 Hari</option>
+                                <option value="5">5 Hari</option>
+                                <option value="7">1 Minggu</option>
+                            </select>
+                         </div>
+                         <div className="flex-1">
+                            <select 
+                                value={budget} 
+                                onChange={(e) => setBudget(e.target.value)}
+                                className="w-full p-2 text-xs border border-gray-300 rounded outline-none bg-white"
+                            >
+                                <option value="">Budget...</option>
+                                <option value="Hemat">Hemat</option>
+                                <option value="Menengah">Standard</option>
+                                <option value="Mewah">Sultan</option>
+                            </select>
+                         </div>
+                     </div>
+                 </div>
+
+                 <button 
+                    onClick={generateItinerary}
+                    disabled={!days || loading}
+                    className={`w-full py-2 rounded-lg font-bold text-sm text-white flex justify-center items-center gap-2 ${!days ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 shadow-md'}`}
+                 >
+                    {loading ? <Loader2 size={18} className="animate-spin"/> : <Sparkles size={18} />}
+                    {loading ? 'Hitung Estimasi Biaya' : 'Buat Rencana & Biaya'}
+                 </button>
+              
+
+                {/* Result Area */}
+                 {result && (
+                    <div className="bg-white p-4 rounded-xl shadow border border-purple-100 text-xs text-gray-700 leading-relaxed whitespace-pre-wrap animate-fadeIn mt-2">
+                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+                             <div className="bg-green-100 p-1 rounded text-green-700"><FileBadge size={16}/></div>
+                             <span className="font-bold text-purple-900">Hasil Analisa AI:</span>
+                        </div>
+                        {result}
+                        
+                        <div className="mt-4 pt-4 border-t border-dashed border-gray-300">
+                            <p className="text-[10px] text-gray-500 mb-2 italic text-center">Pastikan data karyawan di atas sudah benar.</p>
+                            <button 
+                                onClick={sendTravelToWA}
+                                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2 shadow transition-transform transform active:scale-95"
+                            >
+                                <Send size={16}/> Ajukan via WhatsApp
+                            </button>
+                        </div>
+                    </div>
+                 )}
+              </div>
+           </div>
+        )}
+
+        {/* TAMPILAN 3: BOOKING MANUAL (TIKET & HOTEL) */}
+        {view === 'booking' && (
+           <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
+              {/* Header Booking */}
+              <div className="bg-indigo-700 p-4 text-white flex items-center shadow-md">
+                 <button onClick={() => setView('flyer')} className="mr-3 hover:bg-indigo-600 p-1 rounded-full">
+                    <ArrowLeft size={20} />
+                 </button>
+                 <div>
+                    <h2 className="font-bold text-sm">Pesan Tiket & Hotel</h2>
+                    <p className="text-[10px] text-indigo-200">Proses cepat, Fee Jasa hanya 2%</p>
+                 </div>
+              </div>
+
+              {/* Form Booking */}
+              <div className="p-4 space-y-4 overflow-y-auto">
+                 {/* BAGIAN DATA DIRI (REUSED) */}
+                 <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-sm space-y-2">
+                    <div className="flex items-center gap-2 text-indigo-800 mb-1">
+                        <User size={14} />
+                        <h3 className="text-xs font-bold">Data Pemesan</h3>
+                    </div>
+                    <input 
+                        type="text" 
+                        placeholder="Nama Lengkap" 
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
+                    />
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="NIK" 
+                            value={nik}
+                            onChange={(e) => setNik(e.target.value)}
+                            className="flex-1 p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
+                        />
+                        <input 
+                            type="text" 
+                            placeholder="No. Anggota" 
+                            value={kopkarId}
+                            onChange={(e) => setKopkarId(e.target.value)}
+                            className="flex-1 p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none"
+                        />
+                    </div>
+                 </div>
+
+                 {/* JENIS PESANAN */}
+                 <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-sm space-y-3">
+                     <div className="flex items-center gap-2 text-indigo-800 mb-1">
+                        <Ticket size={14} />
+                        <h3 className="text-xs font-bold">Detail Pesanan</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                        {['Pesawat', 'Hotel', 'Kereta'].map((type) => (
+                            <button
+                                key={type}
+                                onClick={() => setBookingType(type)}
+                                className={`p-2 rounded-lg border text-xs font-bold transition-all ${
+                                    bookingType === type 
+                                    ? 'bg-indigo-100 border-indigo-500 text-indigo-800' 
+                                    : 'bg-gray-50 border-gray-200 text-gray-600'
+                                }`}
+                            >
+                                {type}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div>
+                        <label className="text-[11px] font-bold text-gray-700 mb-1 block">
+                            Rincian {bookingType} (Tanggal, Rute/Kota, Maskapai/Nama Hotel)
+                        </label>
+                        <textarea 
+                            rows={4}
+                            placeholder={`Contoh: \n${bookingType === 'Pesawat' ? 'Banjarmasin - Jakarta, 25 Des 2024, Garuda Indonesia, Pagi.' : 'Hotel Fave Banjarbaru, Check In 24 Des, 2 Malam.'}`} 
+                            value={bookingDetails}
+                            onChange={(e) => setBookingDetails(e.target.value)}
+                            className="w-full p-3 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-gray-50 resize-none"
+                        />
+                    </div>
+                 </div>
+
+                 {/* Info Fee */}
+                 <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200 flex items-start gap-2">
+                    <AlertCircle size={16} className="text-indigo-600 mt-0.5" />
+                    <p className="text-[10px] text-indigo-800">
+                        Harga tiket akan ditambahkan <strong>Biaya Jasa 2%</strong>. Total tagihan akan diinformasikan oleh Admin sebelum diproses.
+                    </p>
+                 </div>
+
+                 <button 
+                    onClick={sendBookingToWA}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center space-x-2 transition-transform transform active:scale-95 mt-4"
+                 >
+                    <Send size={18} />
+                    <span>Kirim Pesanan ke WA</span>
+                 </button>
+              </div>
+           </div>
+        )}
+
+        {/* TAMPILAN 4: PAYMENT PPOB */}
+        {view === 'payment' && (
+           <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
+              {/* Header Payment */}
+              <div className="bg-green-700 p-4 text-white flex items-center shadow-md">
+                 <button onClick={() => setView('flyer')} className="mr-3 hover:bg-green-600 p-1 rounded-full">
+                    <ArrowLeft size={20} />
+                 </button>
+                 <div>
+                    <h2 className="font-bold text-sm">Layanan Pembayaran</h2>
+                    <p className="text-[10px] text-green-200">Listrik, PDAM, Indihome & Pulsa</p>
+                 </div>
+              </div>
+
+              {/* Form Input Container */}
+              <div className="p-4 space-y-4 overflow-y-auto">
+                 
+                 {/* BAGIAN DATA DIRI (REUSED) */}
+                 <div className="bg-white p-3 rounded-lg border border-green-200 shadow-sm space-y-2">
+                    <div className="flex items-center gap-2 text-green-800 mb-1">
+                        <User size={14} />
+                        <h3 className="text-xs font-bold">Data Karyawan (Pembayar)</h3>
+                    </div>
+                    <input 
+                        type="text" 
+                        placeholder="Nama Lengkap Karyawan" 
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 outline-none"
+                    />
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="NIK" 
+                            value={nik}
+                            onChange={(e) => setNik(e.target.value)}
+                            className="flex-1 p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 outline-none"
+                        />
+                        <input 
+                            type="text" 
+                            placeholder="No. Anggota (Opsional)" 
+                            value={kopkarId}
+                            onChange={(e) => setKopkarId(e.target.value)}
+                            className="flex-1 p-2 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 outline-none"
+                        />
+                    </div>
+                 </div>
+
+                 {/* BAGIAN PILIH TAGIHAN */}
+                 <div className="bg-white p-3 rounded-lg border border-green-200 shadow-sm space-y-3">
+                     <div className="flex items-center gap-2 text-green-800 mb-1">
+                        <Zap size={14} />
+                        <h3 className="text-xs font-bold">Jenis Tagihan</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                        {['Listrik', 'Indihome', 'PDAM', 'Pulsa'].map((type) => (
+                            <button
+                                key={type}
+                                onClick={() => setBillType(type)}
+                                className={`p-3 rounded-lg border text-xs font-bold flex flex-col items-center justify-center gap-2 transition-all ${
+                                    billType === type 
+                                    ? 'bg-green-100 border-green-500 text-green-800 ring-1 ring-green-500' 
+                                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                {type === 'Listrik' && <Zap size={20}/>}
+                                {type === 'Indihome' && <Wifi size={20}/>}
+                                {type === 'PDAM' && <Droplets size={20}/>}
+                                {type === 'Pulsa' && <Smartphone size={20}/>}
+                                {type}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="pt-2">
+                        <label className="text-[11px] font-bold text-gray-700 mb-1 block">
+                            Masukkan Nomor {billType === 'Pulsa' ? 'HP' : 'Pelanggan / ID'}
+                        </label>
+                        <input 
+                            type="text" 
+                            placeholder={`Contoh: ${billType === 'Listrik' ? '123456789 (ID Pel)' : billType === 'Indihome' ? '0511...' : billType === 'PDAM' ? 'Nomor Sambungan' : '08xxx'}`} 
+                            value={billNumber}
+                            onChange={(e) => setBillNumber(e.target.value)}
+                            className="w-full p-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-gray-50"
+                        />
+                    </div>
+                 </div>
+
+                 {/* Info Jasa */}
+                 <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 flex items-start gap-2">
+                    <AlertCircle size={16} className="text-yellow-600 mt-0.5" />
+                    <p className="text-[10px] text-yellow-800">
+                        Pembayaran akan ditalangi oleh Koperasi dengan jasa <strong>1.5%</strong>. Tagihan akan dipotong gaji bulan depan.
+                    </p>
+                 </div>
+
+                 <button 
+                    onClick={sendBillToWA}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center space-x-2 transition-transform transform active:scale-95 mt-4"
+                 >
+                    <Send size={18} />
+                    <span>Kirim Tagihan ke WA Admin</span>
+                 </button>
+              </div>
+           </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
