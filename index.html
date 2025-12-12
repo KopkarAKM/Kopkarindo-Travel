@@ -36,7 +36,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- Helper Komponen Ikon (Agar Lucide Icon bekerja di React via CDN) ---
+        // --- Helper Komponen Ikon ---
         const Icon = ({ name, size = 24, className = "" }) => {
             useEffect(() => {
                 if (window.lucide) {
@@ -46,7 +46,7 @@
             return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
         };
 
-        // Mapping Ikon agar sesuai dengan kode asli
+        // Mapping Ikon
         const Plane = (p) => <Icon name="plane" {...p} />;
         const Hotel = (p) => <Icon name="hotel" {...p} />;
         const CreditCard = (p) => <Icon name="credit-card" {...p} />;
@@ -69,10 +69,11 @@
         const Smartphone = (p) => <Icon name="smartphone" {...p} />;
         const Ticket = (p) => <Icon name="ticket" {...p} />;
         const Briefcase = (p) => <Icon name="briefcase" {...p} />;
+        const Calculator = (p) => <Icon name="calculator" {...p} />;
 
         // --- KOMPONEN UTAMA ---
         function FlyerKopkrindo() {
-            const [view, setView] = useState('flyer'); // flyer | planner | payment | booking
+            const [view, setView] = useState('flyer'); // flyer | planner | payment | booking | calculator
 
             // State Data Karyawan
             const [name, setName] = useState('');
@@ -94,6 +95,33 @@
             const [bookingType, setBookingType] = useState('Pesawat');
             const [bookingDetails, setBookingDetails] = useState('');
 
+            // State Calculator
+            const [calcAmount, setCalcAmount] = useState('');
+
+            // --- FITUR 1: AUTO-SAVE (LocalStorage) ---
+            // Load data saat aplikasi dibuka
+            useEffect(() => {
+                const savedData = localStorage.getItem('kopkar_user_data');
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    if (parsed.name) setName(parsed.name);
+                    if (parsed.nik) setNik(parsed.nik);
+                    if (parsed.kopkarId) setKopkarId(parsed.kopkarId);
+                }
+            }, []);
+
+            // Simpan data setiap kali ada perubahan input
+            useEffect(() => {
+                const userData = { name, nik, kopkarId };
+                localStorage.setItem('kopkar_user_data', JSON.stringify(userData));
+            }, [name, nik, kopkarId]);
+
+
+            // --- Helper Format Rupiah ---
+            const formatRupiah = (number) => {
+                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
+            };
+
             // --- Background Decor ---
             const BackgroundDecor = () => (
                 <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -101,11 +129,9 @@
                     <div className="absolute top-[15%] right-[10%] text-red-200 opacity-20 rotate-12"><MapPin size={64} /></div>
                     <div className="absolute bottom-[20%] left-[8%] text-yellow-200 opacity-20 -rotate-6"><Bus size={80} /></div>
                     <div className="absolute bottom-[10%] right-[5%] text-purple-200 opacity-20 rotate-45"><Ticket size={96} /></div>
-                    
                     <div className="absolute top-[40%] left-[2%] text-yellow-400 opacity-10"><Zap size={48} /></div>
                     <div className="absolute top-[50%] right-[2%] text-blue-400 opacity-10"><Droplets size={48} /></div>
                     <div className="absolute bottom-[40%] left-[15%] text-green-400 opacity-10"><Wifi size={40} /></div>
-                    
                     <div className="absolute top-0 right-0 w-64 h-64 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
                     <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-700"></div>
                 </div>
@@ -127,11 +153,7 @@
                 setLoading(true);
                 setResult('');
 
-                const apiKey = ""; // API Key akan disuntikkan oleh sistem jika dijalankan di environment yang mendukung, atau biarkan kosong jika client-side murni (perlu input user di real case, tapi di sini kita simulasikan flow).
-                // CATATAN: Karena ini file HTML statis, API call ke Gemini mungkin memerlukan kunci API yang valid.
-                // Jika apiKey kosong, kita akan tampilkan simulasi hasil untuk demo.
-                
-                // Simulasi prompt (jika ada API Key)
+                const apiKey = ""; // API Key 
                 const prompt = `Bertindaklah sebagai staf ahli "Kopkarindo Travel"... (Prompt dipendekkan untuk kode)`;
 
                 try {
@@ -148,7 +170,6 @@
                         const data = await response.json();
                         text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Gagal memuat rekomendasi.";
                     } else {
-                        // Fallback Simulasi jika tidak ada API Key (Agar demo tetap jalan)
                         await new Promise(r => setTimeout(r, 2000));
                         text = `**Simulasi Hasil (API Key Kosong):**\n\n1. **Tujuan**: ${destination || 'Bali'} (${days} Hari)\n2. **Rencana**: Hari 1 Check-in, Hari 2 Wisata, Hari 3 Check-out.\n3. **Estimasi**: Rp 5.000.000 (Tiket & Hotel).\n4. **Simulasi Kopkarindo**: Total Rp 5.250.000 (termasuk Fee 5%). Angsuran Rp 437.500/bln (12x).`;
                     }
@@ -177,6 +198,12 @@
                 const msg = `Halo Admin Kopkarindo Travel 👋\n\nPemesanan Tiket/Hotel:\n\n📋 *DATA PEMESAN*\nNama: ${name}\nNIK: ${nik}\n\n🎫 *DETAIL BOOKING*\nKategori: ${bookingType}\nDetail: ${bookingDetails}\n\nSaya setuju *Fee Jasa 2%*. Mohon info harga.`;
                 window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(msg)}`, '_blank');
             };
+
+            const sendCalcToWA = (principal, fee, total, tenor, installment) => {
+                if (!name || !nik) { alert("Mohon lengkapi Data Karyawan (Nama & NIK) di menu ini."); return; }
+                const msg = `Halo Admin Kopkarindo 👋\n\nSaya ingin mengajukan pinjaman dana:\n\n📋 *DATA KARYAWAN*\nNama: ${name}\nNIK: ${nik}\n\n💰 *SIMULASI PENGAJUAN*\nDana Dibutuhkan: ${formatRupiah(principal)}\nJasa Fee (5%): ${formatRupiah(fee)}\nTotal Pinjaman: ${formatRupiah(total)}\n\nTenor: ${tenor} Bulan\nAngsuran: ${formatRupiah(installment)}/bulan\n\nMohon info syarat selanjutnya.`;
+                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(msg)}`, '_blank');
+            }
 
             // --- Render Tampilan ---
             return (
@@ -218,6 +245,14 @@
                                             <div className="text-xs flex-1">
                                                 <span className="font-bold text-gray-800 block flex justify-between">Bayar Tagihan & Pulsa <span className="bg-green-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Klik Sini</span></span>
                                                 <span className="text-gray-500">Indihome, PDAM, Listrik (Jasa 1.5%)</span>
+                                            </div>
+                                        </div>
+                                        {/* FITUR 2: TOMBOL MENU KALKULATOR */}
+                                        <div onClick={() => setView('calculator')} className="flex items-center p-2 bg-amber-50/90 rounded-lg border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors group shadow-sm">
+                                            <div className="bg-amber-100 p-2 rounded-full mr-3 group-hover:bg-white"><Calculator size={18} className="text-amber-600" /></div>
+                                            <div className="text-xs flex-1">
+                                                <span className="font-bold text-gray-800 block flex justify-between">Simulasi Cicilan <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Mandiri</span></span>
+                                                <span className="text-gray-500">Hitung angsuran pinjaman (12/24 Bulan)</span>
                                             </div>
                                         </div>
                                     </div>
@@ -331,6 +366,69 @@
                                         <input type="text" placeholder="Nomor Pelanggan / ID" value={billNumber} onChange={(e) => setBillNumber(e.target.value)} className="w-full p-3 text-sm border border-gray-300 rounded-lg outline-none" />
                                     </div>
                                     <button onClick={sendBillToWA} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center space-x-2 mt-4"><Send size={18} /><span>Kirim Tagihan</span></button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* VIEW 5: FITUR BARU - KALKULATOR CICILAN */}
+                        {view === 'calculator' && (
+                            <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
+                                <div className="bg-amber-600 p-4 text-white flex items-center shadow-md">
+                                    <button onClick={() => setView('flyer')} className="mr-3 hover:bg-amber-500 p-1 rounded-full"><ArrowLeft size={20} /></button>
+                                    <div><h2 className="font-bold text-sm">Simulasi Cicilan Mandiri</h2><p className="text-[10px] text-amber-100">Transparansi Finansial Anggota</p></div>
+                                </div>
+                                <div className="p-4 space-y-4 overflow-y-auto">
+                                    {/* Data Karyawan (Auto-Saved) */}
+                                    <div className="bg-white p-3 rounded-lg border border-amber-200 shadow-sm space-y-2">
+                                        <div className="flex items-center gap-2 text-amber-800 mb-1"><User size={14} /><h3 className="text-xs font-bold">Data Karyawan</h3></div>
+                                        <input type="text" placeholder="Nama Lengkap" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
+                                        <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
+                                    </div>
+
+                                    {/* Input Nominal */}
+                                    <div className="bg-white p-4 rounded-lg border border-amber-200 shadow-sm space-y-3">
+                                        <div className="flex items-center gap-2 text-amber-800 mb-1"><Wallet size={14} /><h3 className="text-xs font-bold">Berapa Dana Yang Dibutuhkan?</h3></div>
+                                        <input 
+                                            type="number" 
+                                            placeholder="Contoh: 5000000" 
+                                            value={calcAmount} 
+                                            onChange={(e) => setCalcAmount(e.target.value)} 
+                                            className="w-full p-3 text-lg font-bold text-gray-700 border border-amber-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500" 
+                                        />
+                                        <p className="text-[10px] text-gray-500 italic">*Masukkan nominal tanpa titik/koma</p>
+                                    </div>
+
+                                    {/* Hasil Perhitungan (Otomatis) */}
+                                    {calcAmount && !isNaN(calcAmount) && calcAmount > 0 ? (() => {
+                                        const principal = parseFloat(calcAmount);
+                                        const fee = principal * 0.05; // 5% Flat
+                                        const total = principal + fee;
+                                        const tenor = principal <= 10000000 ? 12 : 24;
+                                        const installment = total / tenor;
+                                        
+                                        return (
+                                            <div className="bg-white p-4 rounded-xl shadow border border-amber-200 animate-fadeIn">
+                                                <h3 className="text-xs font-bold text-gray-700 border-b border-gray-100 pb-2 mb-2">Rincian Angsuran</h3>
+                                                <div className="space-y-2 text-xs">
+                                                    <div className="flex justify-between"><span>Pokok Pinjaman:</span> <span className="font-medium">{formatRupiah(principal)}</span></div>
+                                                    <div className="flex justify-between text-amber-600"><span>Jasa Fee (5%):</span> <span className="font-medium">+ {formatRupiah(fee)}</span></div>
+                                                    <div className="flex justify-between font-bold text-gray-900 pt-2 border-t border-dashed"><span>Total Pinjaman:</span> <span>{formatRupiah(total)}</span></div>
+                                                    <div className="flex justify-between items-center bg-amber-50 p-2 rounded mt-2">
+                                                        <span className="text-amber-800 font-bold">Cicilan / Bulan:</span>
+                                                        <div className="text-right">
+                                                            <span className="block text-lg font-bold text-amber-700">{formatRupiah(installment)}</span>
+                                                            <span className="text-[9px] text-gray-500">Selama {tenor} Bulan</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => sendCalcToWA(principal, fee, total, tenor, installment)} className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center space-x-2 mt-4"><Send size={18} /><span>Ajukan Sekarang</span></button>
+                                            </div>
+                                        );
+                                    })() : (
+                                        <div className="text-center text-gray-400 py-4 text-xs">
+                                            Masukkan nominal untuk melihat simulasi angsuran.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
