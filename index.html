@@ -16,6 +16,10 @@
         #root { width: 100%; min-height: 100%; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+        
+        /* Hide scrollbar for cleaner look */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-slate-100 font-sans">
@@ -25,36 +29,25 @@
     <script type="text/babel">
         const { useState, useEffect, memo, useRef } = React;
 
-        // --- PERBAIKAN: Komponen Icon yang Aman untuk React + CDN ---
-        // Menggunakan ref dan manipulasi DOM manual di dalam wrapper span
-        // untuk mencegah konflik Virtual DOM React dengan replaceWith() milik Lucide.
+        // --- Helper Komponen Ikon ---
         const Icon = memo(({ name, size = 24, className = "" }) => {
             const ref = useRef(null);
-
             useEffect(() => {
                 if (window.lucide && ref.current) {
-                    // 1. Buat elemen i manual
                     const element = document.createElement('i');
                     element.setAttribute('data-lucide', name);
                     element.setAttribute('width', size);
                     element.setAttribute('height', size);
                     if (className) element.setAttribute('class', className);
-
-                    // 2. Bersihkan container dan masukkan elemen i
                     ref.current.innerHTML = '';
                     ref.current.appendChild(element);
-
-                    // 3. Minta Lucide merender ikon HANYA di dalam container ini
-                    window.lucide.createIcons({
-                        root: ref.current
-                    });
+                    window.lucide.createIcons({ root: ref.current });
                 }
             }, [name, size, className]);
-
-            // React hanya mengontrol span ini, isinya (svg/i) diurus oleh useEffect di atas
             return <span ref={ref} className="inline-flex items-center justify-center" style={{ width: size, height: size, verticalAlign: 'middle' }}></span>;
         });
 
+        // Icon Definitions
         const Plane = (p) => <Icon name="plane" {...p} />;
         const Hotel = (p) => <Icon name="hotel" {...p} />;
         const CreditCard = (p) => <Icon name="credit-card" {...p} />;
@@ -77,6 +70,9 @@
         const Ticket = (p) => <Icon name="ticket" {...p} />;
         const Briefcase = (p) => <Icon name="briefcase" {...p} />;
         const Calculator = (p) => <Icon name="calculator" {...p} />;
+        const ChevronLeft = (p) => <Icon name="chevron-left" {...p} />;
+        const ChevronRight = (p) => <Icon name="chevron-right" {...p} />;
+        const CalendarIcon = (p) => <Icon name="calendar" {...p} />;
 
         const BackgroundDecor = memo(() => (
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -100,21 +96,48 @@
             </div>
         ));
 
+        // --- DATA LIBUR NASIONAL 2025 (Estimasi) ---
+        const HOLIDAYS_2025 = {
+            "1-1": "Tahun Baru 2025",
+            "1-27": "Isra Mikraj",
+            "1-29": "Tahun Baru Imlek",
+            "3-29": "Hari Suci Nyepi",
+            "3-31": "Idul Fitri 1446 H",
+            "4-1": "Cuti Bersama Idul Fitri",
+            "4-18": "Wafat Yesus Kristus",
+            "5-1": "Hari Buruh",
+            "5-12": "Hari Waisak",
+            "5-29": "Kenaikan Yesus Kristus",
+            "6-1": "Hari Lahir Pancasila",
+            "6-6": "Idul Adha 1446 H",
+            "6-27": "Tahun Baru Islam",
+            "8-17": "HUT RI ke-80",
+            "9-5": "Maulid Nabi Muhammad SAW",
+            "12-25": "Hari Raya Natal"
+        };
+
         function FlyerKopkrindo() {
             const [view, setView] = useState('flyer');
             const [name, setName] = useState('');
             const [nik, setNik] = useState('');
             const [kopkarId, setKopkarId] = useState('');
+            
+            // Planner State
             const [destination, setDestination] = useState('');
             const [days, setDays] = useState('');
-            const [budget, setBudget] = useState('Standar'); // Default Standar
+            const [budget, setBudget] = useState('Standar');
             const [result, setResult] = useState('');
             const [loading, setLoading] = useState(false);
+            
+            // Other States
             const [billType, setBillType] = useState('Listrik'); 
             const [billNumber, setBillNumber] = useState('');
             const [bookingType, setBookingType] = useState('Pesawat');
             const [bookingDetails, setBookingDetails] = useState('');
             const [calcAmount, setCalcAmount] = useState('');
+
+            // Calendar State
+            const [currentDate, setCurrentDate] = useState(new Date());
 
             useEffect(() => {
                 const savedData = localStorage.getItem('kopkar_user_data');
@@ -133,20 +156,105 @@
 
             const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
 
-            // --- LOGIKA OFFLINE PINTAR (PENGGANTI AI) ---
+            // --- Calendar Logic ---
+            const getDaysInMonth = (date) => {
+                const year = date.getFullYear();
+                const month = date.getMonth();
+                const days = new Date(year, month + 1, 0).getDate();
+                const firstDay = new Date(year, month, 1).getDay();
+                return { days, firstDay, year, month };
+            };
+
+            const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+            const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+
+            const handleDateClick = (day, month, year, holidayName) => {
+                if (holidayName) {
+                    // Jika klik tanggal merah, tawarkan paket
+                    if (confirm(`📅 ${holidayName}\n\nIni tanggal merah! Mau rencanakan liburan untuk tanggal ini?`)) {
+                        setDestination(`Liburan ${holidayName}`);
+                        setDays('3'); // Default 3 hari
+                        setView('planner');
+                    }
+                }
+            };
+
+            const renderCalendar = () => {
+                const { days, firstDay, year, month } = getDaysInMonth(currentDate);
+                const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+                const dayNames = ["M", "S", "S", "R", "K", "J", "S"];
+                
+                let calendarDays = [];
+                // Empty slots for prev month
+                for (let i = 0; i < firstDay; i++) {
+                    calendarDays.push(<div key={`empty-${i}`} className="h-8"></div>);
+                }
+                
+                // Days
+                for (let d = 1; d <= days; d++) {
+                    const dateKey = `${month + 1}-${d}`;
+                    const isHoliday = HOLIDAYS_2025[dateKey];
+                    const isToday = new Date().getDate() === d && new Date().getMonth() === month && new Date().getFullYear() === year;
+                    
+                    calendarDays.push(
+                        <div 
+                            key={d} 
+                            onClick={() => handleDateClick(d, month, year, isHoliday)}
+                            className={`h-8 flex items-center justify-center text-xs rounded-full cursor-pointer transition-all
+                                ${isHoliday ? 'bg-red-100 text-red-600 font-bold hover:bg-red-200 ring-1 ring-red-300' : ''}
+                                ${isToday ? 'bg-blue-600 text-white font-bold' : 'text-gray-700 hover:bg-gray-100'}
+                            `}
+                            title={isHoliday || ''}
+                        >
+                            {d}
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="bg-white rounded-lg border border-slate-200 p-3 shadow-sm mb-3">
+                        <div className="flex justify-between items-center mb-2">
+                            <button onClick={handlePrevMonth} className="p-1 hover:bg-slate-100 rounded"><ChevronLeft size={16} className="text-slate-500"/></button>
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                <CalendarIcon size={14} className="text-blue-500"/> {monthNames[month]} {year}
+                            </span>
+                            <button onClick={handleNextMonth} className="p-1 hover:bg-slate-100 rounded"><ChevronRight size={16} className="text-slate-500"/></button>
+                        </div>
+                        
+                        {/* Grid Header */}
+                        <div className="grid grid-cols-7 gap-1 mb-1 text-center">
+                            {dayNames.map((dn, idx) => (
+                                <div key={idx} className={`text-[10px] font-bold ${idx===0 ? 'text-red-500':'text-slate-400'}`}>{dn}</div>
+                            ))}
+                        </div>
+                        
+                        {/* Grid Days */}
+                        <div className="grid grid-cols-7 gap-1 text-center">
+                            {calendarDays}
+                        </div>
+
+                        {/* Holiday Legend */}
+                        <div className="mt-2 pt-2 border-t border-dashed border-slate-200">
+                            <p className="text-[9px] text-slate-500 text-center italic">
+                                *Klik tanggal <span className="text-red-500 font-bold">MERAH</span> untuk merencanakan liburan!
+                            </p>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Logic Functions ---
             const generateOfflineItinerary = () => {
                 const dur = parseInt(days);
-                const dest = destination || "Destinasi Populer (Bali/Jogja/Jakarta)";
-                let flightCost = 2000000; // Default PP
-                let dailyCost = 500000;   // Default Hotel + Makan per hari
+                const dest = destination || "Destinasi Populer";
+                let flightCost = 2000000; 
+                let dailyCost = 500000;   
                 
-                // Logika Sederhana Estimasi Harga
                 if (budget === 'Hemat') { dailyCost = 350000; flightCost = 1500000; }
                 if (budget === 'Mewah') { dailyCost = 1500000; flightCost = 3000000; }
                 
-                // Deteksi Tujuan (Simpel)
                 const lowerDest = dest.toLowerCase();
-                if (lowerDest.includes('banjar') || lowerDest.includes('kalsel')) flightCost = 500000; // Lokal
+                if (lowerDest.includes('banjar') || lowerDest.includes('kalsel')) flightCost = 500000; 
                 if (lowerDest.includes('jakarta') || lowerDest.includes('surabaya')) flightCost = 1800000;
                 if (lowerDest.includes('bali') || lowerDest.includes('lombok')) flightCost = 2500000;
 
@@ -156,136 +264,65 @@
                 const tenor = totalPinjaman <= 10000000 ? 12 : 24;
                 const angsuran = totalPinjaman / tenor;
 
-                return `**ESTIMASI SISTEM (LOGIKA CERDAS):**\n\n` +
-                       `1. **Tujuan**: ${dest} (${dur} Hari - ${budget})\n` +
-                       `2. **Gambaran Biaya**:\n` +
-                       `   - Transportasi (PP): ± ${formatRupiah(flightCost)}\n` +
-                       `   - Akomodasi & Saku: ± ${formatRupiah(dailyCost)} x ${dur} hari\n` +
-                       `   -----------------------------------\n` +
-                       `   **Estimasi Total: ${formatRupiah(totalBiayaMurni)}**\n\n` +
-                       `3. **SIMULASI KOPKARINDO**:\n` +
-                       `   - Jasa Fee (5%): ${formatRupiah(feeJasa)}\n` +
-                       `   - Total Pinjaman: ${formatRupiah(totalPinjaman)}\n` +
-                       `   - Tenor: ${tenor} Bulan\n` +
-                       `   👉 **Angsuran: ${formatRupiah(angsuran)} /bulan**\n\n` +
-                       `*Catatan: Ini adalah hitungan otomatis sistem. Harga real akan dikonfirmasi Admin.*`;
+                return `**ESTIMASI SISTEM (LOGIKA CERDAS):**\n\n1. **Tujuan**: ${dest} (${dur} Hari - ${budget})\n2. **Gambaran Biaya**:\n   - Transportasi (PP): ± ${formatRupiah(flightCost)}\n   - Akomodasi & Saku: ± ${formatRupiah(dailyCost)} x ${dur} hari\n   -----------------------------------\n   **Estimasi Total: ${formatRupiah(totalBiayaMurni)}**\n\n3. **SIMULASI KOPKARINDO**:\n   - Jasa Fee (5%): ${formatRupiah(feeJasa)}\n   - Total Pinjaman: ${formatRupiah(totalPinjaman)}\n   - Tenor: ${tenor} Bulan\n   👉 **Angsuran: ${formatRupiah(angsuran)} /bulan**\n\n*Catatan: Ini adalah hitungan otomatis sistem.*`;
             };
 
             const generateItinerary = async () => {
                 if (!days) return;
                 setLoading(true);
                 setResult('');
-
-                // API KEY (Kosongkan jika ingin pakai Mode Offline/Hemat Kuota)
                 const apiKey = ""; 
-
                 if (!apiKey) {
-                    // Jika API Key kosong, langsung gunakan Logika Offline
-                    await new Promise(r => setTimeout(r, 1000)); // Pura-pura mikir biar user senang
+                    await new Promise(r => setTimeout(r, 1000));
                     setResult(generateOfflineItinerary());
                     setLoading(false);
                     return;
                 }
-
-                // Jika ada API Key, gunakan AI
-                const prompt = `Bertindaklah sebagai staf Kopkarindo.
-User ke: ${destination || "Domestik Populer"}. Durasi: ${days} hari. Budget: ${budget}.
-Berikan respon singkat:
-1. Tujuan
-2. Rencana Harian Singkat
-3. Estimasi Biaya (Tiket, Hotel, Saku)
-4. Simulasi Kopkarindo (Total Biaya + Jasa 5%, Tenor 12/24 bulan, Angsuran per bulan).`;
-
+                const prompt = `Bertindaklah sebagai staf Kopkarindo. User ke: ${destination}. Durasi: ${days} hari. Budget: ${budget}. Berikan respon singkat: 1. Tujuan 2. Rencana Harian 3. Estimasi Biaya 4. Simulasi Kopkarindo (Jasa 5%).`;
                 try {
-                    const response = await fetch(
-                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
-                        {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-                        }
-                    );
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
                     const data = await response.json();
-                    if (data.error) throw new Error(data.error.message);
                     setResult(data.candidates?.[0]?.content?.parts?.[0]?.text || "Gagal memuat.");
-                } catch (error) {
-                    // Fallback ke Offline jika API Error/Habis
-                    setResult(generateOfflineItinerary());
-                } finally {
-                    setLoading(false);
-                }
+                } catch (error) { setResult(generateOfflineItinerary()); } finally { setLoading(false); }
             };
 
-            const sendTravelToWA = () => {
-                if (!name || !nik) { alert("Mohon lengkapi Nama dan NIK."); return; }
-                const msg = `Halo Admin Kopkarindo Travel 👋\n\nSaya ingin mengajukan pinjaman perjalanan wisata:\n\n📋 *DATA KARYAWAN*\nNama: ${name}\nNIK: ${nik}\nNo Anggota: ${kopkarId || '-'}\n\n✈️ *RENCANA PERJALANAN*\n----------------\n${result}\n----------------\nMohon dicek kembali harga real-nya. Terima kasih.`;
-                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(msg)}`, '_blank');
-            };
-
-            const sendBillToWA = () => {
-                if (!name || !nik || !billNumber) { alert("Mohon lengkapi Nama, NIK, dan Nomor Tagihan."); return; }
-                const msg = `Halo Admin Kopkarindo 👋\n\nPengajuan pembayaran tagihan (Potong Gaji):\n\n📋 *DATA KARYAWAN*\nNama: ${name}\nNIK: ${nik}\n\n⚡ *DETAIL TAGIHAN*\nJenis: ${billType}\nNomor: ${billNumber}\n\nMohon diproses segera.`;
-                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(msg)}`, '_blank');
-            };
-
-            const sendBookingToWA = () => {
-                if (!name || !nik || !bookingDetails) { alert("Mohon lengkapi Nama, NIK, dan Detail Pesanan."); return; }
-                const msg = `Halo Admin Kopkarindo Travel 👋\n\nPemesanan Tiket/Hotel:\n\n📋 *DATA PEMESAN*\nNama: ${name}\nNIK: ${nik}\n\n🎫 *DETAIL BOOKING*\nKategori: ${bookingType}\nDetail: ${bookingDetails}\n\nSaya setuju *Fee Jasa 2%*. Mohon info harga.`;
-                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(msg)}`, '_blank');
-            };
-
-            const sendCalcToWA = (principal, fee, total, tenor, installment) => {
-                if (!name || !nik) { alert("Mohon lengkapi Data Karyawan (Nama & NIK) di menu ini."); return; }
-                const msg = `Halo Admin Kopkarindo 👋\n\nSaya ingin mengajukan pinjaman dana:\n\n📋 *DATA KARYAWAN*\nNama: ${name}\nNIK: ${nik}\n\n💰 *SIMULASI PENGAJUAN*\nDana Dibutuhkan: ${formatRupiah(principal)}\nJasa Fee (5%): ${formatRupiah(fee)}\nTotal Pinjaman: ${formatRupiah(total)}\n\nTenor: ${tenor} Bulan\nAngsuran: ${formatRupiah(installment)}/bulan\n\nMohon info syarat selanjutnya.`;
-                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(msg)}`, '_blank');
-            }
+            const sendTravelToWA = () => { if (!name || !nik) { alert("Lengkapi Nama/NIK."); return; } window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Pinjaman Wisata:\nNama: ${name}\nNIK: ${nik}\n\n${result}`)}`, '_blank'); };
+            const sendBillToWA = () => { if (!name || !nik || !billNumber) { alert("Lengkapi Data."); return; } window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Bayar Tagihan:\nNama: ${name}\nNIK: ${nik}\nJenis: ${billType}\nNomor: ${billNumber}`)}`, '_blank'); };
+            const sendBookingToWA = () => { if (!name || !nik || !bookingDetails) { alert("Lengkapi Data."); return; } window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Pesan Tiket:\nNama: ${name}\nNIK: ${nik}\nDetail: ${bookingDetails}`)}`, '_blank'); };
+            const sendCalcToWA = (p, f, t, ten, inst) => { if (!name || !nik) { alert("Lengkapi Nama/NIK."); return; } window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Simulasi Pinjaman:\nNama: ${name}\nNIK: ${nik}\nDana: ${formatRupiah(p)}\nTotal: ${formatRupiah(t)}\nAngsuran: ${formatRupiah(inst)} x ${ten} bulan`)}`, '_blank'); }
 
             return (
                 <div className="flex flex-col items-center min-h-screen w-full p-4 relative overflow-hidden">
                     <BackgroundDecor />
-
                     <div className="w-full max-w-md bg-white shadow-2xl rounded-xl overflow-hidden border border-gray-200 relative min-h-[600px] flex flex-col z-10 my-auto">
                         <CardWatermark />
 
+                        {/* VIEW 1: FLYER UTAMA */}
                         {view === 'flyer' && (
                             <div className="flex-1 flex flex-col animate-fadeIn relative z-10">
                                 <div className="bg-blue-900 p-6 text-white text-center relative overflow-hidden">
                                     <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-yellow-400 via-blue-900 to-black"></div>
-                                    <div className="relative z-10 flex justify-center mb-4">
-                                        <img src="https://i.ibb.co.com/8Df6kd0M/Untitled-design-1.png" alt="Logo" className="w-24 h-auto drop-shadow-lg"/>
-                                    </div>
+                                    <div className="relative z-10 flex justify-center mb-4"><img src="https://i.ibb.co.com/8Df6kd0M/Untitled-design-1.png" alt="Logo" className="w-24 h-auto drop-shadow-lg"/></div>
                                     <div className="relative z-10 inline-block bg-yellow-500 text-blue-900 px-3 py-1 rounded-full text-[10px] font-bold mb-2 animate-pulse">SOLUSI DIGITAL ANGGOTA</div>
                                     <h1 className="text-2xl font-extrabold leading-tight mb-2 relative z-10">Liburan Puas, <br/> Tagihan Tuntas!</h1>
-                                    <p className="text-blue-100 text-[10px] relative z-10 px-4 mt-1">Satu aplikasi untuk Travel, Hotel, & Pembayaran PPOB.</p>
-                                </div>
-
-                                <div className="bg-red-50 p-3 flex items-start space-x-2 border-b border-red-100 relative z-20">
-                                    <div className="text-red-600 mt-0.5"><AlertCircle size={16} /></div>
-                                    <p className="text-red-800 text-[10px] leading-relaxed"><strong>Info Akhir Tahun:</strong> Kuota tiket & hotel Desember menipis. Amankan sekarang!</p>
                                 </div>
 
                                 <div className="p-4 bg-white/80 backdrop-blur-sm flex-1 relative z-10">
+                                    {/* KALENDER FITUR BARU */}
+                                    {renderCalendar()}
+
                                     <div className="grid grid-cols-1 gap-3">
                                         <div onClick={() => setView('booking')} className="flex items-center p-2 bg-indigo-50/90 rounded-lg border border-indigo-100 cursor-pointer hover:bg-indigo-100 transition-colors group shadow-sm">
                                             <div className="bg-indigo-100 p-2 rounded-full mr-3 group-hover:bg-white"><Ticket size={18} className="text-indigo-600" /></div>
-                                            <div className="text-xs flex-1">
-                                                <span className="font-bold text-gray-800 block flex justify-between">Tiket & Hotel <span className="bg-indigo-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Baru</span></span>
-                                                <span className="text-gray-500">Pesan Langsung (Fee Jasa 2%)</span>
-                                            </div>
+                                            <div className="text-xs flex-1"><span className="font-bold text-gray-800 block flex justify-between">Tiket & Hotel <span className="bg-indigo-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Baru</span></span><span className="text-gray-500">Pesan Langsung (Fee Jasa 2%)</span></div>
                                         </div>
                                         <div onClick={() => setView('payment')} className="flex items-center p-2 bg-green-50/90 rounded-lg border border-green-100 cursor-pointer hover:bg-green-100 transition-colors group shadow-sm">
                                             <div className="bg-green-100 p-2 rounded-full mr-3 group-hover:bg-white"><Zap size={18} className="text-green-600" /></div>
-                                            <div className="text-xs flex-1">
-                                                <span className="font-bold text-gray-800 block flex justify-between">Bayar Tagihan & Pulsa <span className="bg-green-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Klik Sini</span></span>
-                                                <span className="text-gray-500">Indihome, PDAM, Listrik (Jasa 1.5%)</span>
-                                            </div>
+                                            <div className="text-xs flex-1"><span className="font-bold text-gray-800 block flex justify-between">Bayar Tagihan <span className="bg-green-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">PPOB</span></span><span className="text-gray-500">Listrik, Air, Pulsa (Jasa 1.5%)</span></div>
                                         </div>
                                         <div onClick={() => setView('calculator')} className="flex items-center p-2 bg-amber-50/90 rounded-lg border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors group shadow-sm">
                                             <div className="bg-amber-100 p-2 rounded-full mr-3 group-hover:bg-white"><Calculator size={18} className="text-amber-600" /></div>
-                                            <div className="text-xs flex-1">
-                                                <span className="font-bold text-gray-800 block flex justify-between">Simulasi Cicilan <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Mandiri</span></span>
-                                                <span className="text-gray-500">Hitung angsuran pinjaman (12/24 Bulan)</span>
-                                            </div>
+                                            <div className="text-xs flex-1"><span className="font-bold text-gray-800 block flex justify-between">Simulasi Cicilan <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Mandiri</span></span><span className="text-gray-500">Hitung angsuran pinjaman</span></div>
                                         </div>
                                     </div>
                                 </div>
@@ -294,19 +331,18 @@ Berikan respon singkat:
                                     <div className="absolute top-0 right-0 p-2 opacity-20"><Sparkles size={60} /></div>
                                     <div className="relative z-10">
                                         <h3 className="font-bold text-sm flex items-center gap-2"><Sparkles size={16} className="text-yellow-300" /> Bingung Mau Kemana?</h3>
-                                        <p className="text-[11px] text-purple-100 mt-1 mb-3">Gunakan <strong>Smart Planner</strong>. Kami hitung biayanya otomatis!</p>
+                                        <p className="text-[11px] text-purple-100 mt-1 mb-3">Gunakan <strong>Smart Planner</strong>. Kami buatkan rencananya!</p>
                                         <button className="bg-white text-purple-700 text-xs font-bold py-2 px-4 rounded-full w-full">Coba Rencanakan Sekarang</button>
                                     </div>
                                 </div>
 
                                 <div className="bg-gray-900 p-4 mt-auto relative z-10">
                                     <button onClick={() => window.open('https://wa.me/6285248626532', '_blank')} className="w-full bg-yellow-500 text-blue-900 font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center space-x-2 text-sm"><Phone size={18} /><span>Chat WA: 0852-4862-6532</span></button>
-                                    <button onClick={() => window.open('https://www.instagram.com/kopkarindotravel', '_blank')} className="w-full mt-3 bg-transparent border border-gray-600 hover:bg-gray-800 text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center space-x-2"><Instagram size={18} /><span>@kopkarindotravel</span></button>
-                                    <p className="text-gray-500 text-[10px] mt-4 text-center">© 2024 Kopkarindo Travel Unit Usaha Koperasi</p>
                                 </div>
                             </div>
                         )}
 
+                        {/* VIEW 2: AI PLANNER */}
                         {view === 'planner' && (
                             <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
                                 <div className="bg-purple-700 p-4 text-white flex items-center shadow-md">
@@ -347,6 +383,7 @@ Berikan respon singkat:
                             </div>
                         )}
 
+                        {/* VIEW 3: BOOKING MANUAL */}
                         {view === 'booking' && (
                             <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
                                 <div className="bg-indigo-700 p-4 text-white flex items-center shadow-md">
@@ -373,6 +410,7 @@ Berikan respon singkat:
                             </div>
                         )}
 
+                        {/* VIEW 4: PAYMENT PPOB */}
                         {view === 'payment' && (
                             <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
                                 <div className="bg-green-700 p-4 text-white flex items-center shadow-md">
@@ -399,6 +437,7 @@ Berikan respon singkat:
                             </div>
                         )}
 
+                        {/* VIEW 5: CALCULATOR */}
                         {view === 'calculator' && (
                             <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
                                 <div className="bg-amber-600 p-4 text-white flex items-center shadow-md">
@@ -411,20 +450,17 @@ Berikan respon singkat:
                                         <input type="text" placeholder="Nama Lengkap" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
                                         <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
                                     </div>
-
                                     <div className="bg-white p-4 rounded-lg border border-amber-200 shadow-sm space-y-3">
                                         <div className="flex items-center gap-2 text-amber-800 mb-1"><Wallet size={14} /><h3 className="text-xs font-bold">Berapa Dana Yang Dibutuhkan?</h3></div>
                                         <input type="number" placeholder="Contoh: 5000000" value={calcAmount} onChange={(e) => setCalcAmount(e.target.value)} className="w-full p-3 text-lg font-bold text-gray-700 border border-amber-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500" />
                                         <p className="text-[10px] text-gray-500 italic">*Masukkan nominal tanpa titik/koma</p>
                                     </div>
-
                                     {calcAmount && !isNaN(calcAmount) && calcAmount > 0 ? (() => {
                                         const principal = parseFloat(calcAmount);
                                         const fee = principal * 0.05; 
                                         const total = principal + fee;
                                         const tenor = principal <= 10000000 ? 12 : 24;
                                         const installment = total / tenor;
-                                        
                                         return (
                                             <div className="bg-white p-4 rounded-xl shadow border border-amber-200 animate-fadeIn">
                                                 <h3 className="text-xs font-bold text-gray-700 border-b border-gray-100 pb-2 mb-2">Rincian Angsuran</h3>
@@ -443,9 +479,7 @@ Berikan respon singkat:
                                                 <button onClick={() => sendCalcToWA(principal, fee, total, tenor, installment)} className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center space-x-2 mt-4"><Send size={18} /><span>Ajukan Sekarang</span></button>
                                             </div>
                                         );
-                                    })() : (
-                                        <div className="text-center text-gray-400 py-4 text-xs">Masukkan nominal untuk melihat simulasi angsuran.</div>
-                                    )}
+                                    })() : ( <div className="text-center text-gray-400 py-4 text-xs">Masukkan nominal untuk melihat simulasi angsuran.</div> )}
                                 </div>
                             </div>
                         )}
