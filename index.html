@@ -16,10 +16,13 @@
         #root { width: 100%; min-height: 100%; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
-        
-        /* Hide scrollbar for cleaner look */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Card Shine Effect */
+        .card-shine {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+        }
     </style>
 </head>
 <body class="bg-slate-100 font-sans">
@@ -29,7 +32,6 @@
     <script type="text/babel">
         const { useState, useEffect, memo, useRef } = React;
 
-        // --- Helper Komponen Ikon ---
         const Icon = memo(({ name, size = 24, className = "" }) => {
             const ref = useRef(null);
             useEffect(() => {
@@ -73,6 +75,11 @@
         const ChevronLeft = (p) => <Icon name="chevron-left" {...p} />;
         const ChevronRight = (p) => <Icon name="chevron-right" {...p} />;
         const CalendarIcon = (p) => <Icon name="calendar" {...p} />;
+        const HistoryIcon = (p) => <Icon name="history" {...p} />;
+        const Trash2 = (p) => <Icon name="trash-2" {...p} />;
+        const IdCard = (p) => <Icon name="id-card" {...p} />;
+        const QrCode = (p) => <Icon name="qr-code" {...p} />;
+        const Building = (p) => <Icon name="building-2" {...p} />;
 
         const BackgroundDecor = memo(() => (
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -96,32 +103,24 @@
             </div>
         ));
 
-        // --- DATA LIBUR NASIONAL 2025 (Estimasi) ---
         const HOLIDAYS_2025 = {
-            "1-1": "Tahun Baru 2025",
-            "1-27": "Isra Mikraj",
-            "1-29": "Tahun Baru Imlek",
-            "3-29": "Hari Suci Nyepi",
-            "3-31": "Idul Fitri 1446 H",
-            "4-1": "Cuti Bersama Idul Fitri",
-            "4-18": "Wafat Yesus Kristus",
-            "5-1": "Hari Buruh",
-            "5-12": "Hari Waisak",
-            "5-29": "Kenaikan Yesus Kristus",
-            "6-1": "Hari Lahir Pancasila",
-            "6-6": "Idul Adha 1446 H",
-            "6-27": "Tahun Baru Islam",
-            "8-17": "HUT RI ke-80",
-            "9-5": "Maulid Nabi Muhammad SAW",
-            "12-25": "Hari Raya Natal"
+            "1-1": "Tahun Baru 2025", "1-27": "Isra Mikraj", "1-29": "Tahun Baru Imlek", "3-29": "Hari Suci Nyepi", "3-31": "Idul Fitri 1446 H",
+            "4-1": "Cuti Bersama Idul Fitri", "4-18": "Wafat Yesus Kristus", "5-1": "Hari Buruh", "5-12": "Hari Waisak", "5-29": "Kenaikan Yesus Kristus",
+            "6-1": "Hari Lahir Pancasila", "6-6": "Idul Adha 1446 H", "6-27": "Tahun Baru Islam", "8-17": "HUT RI ke-80", "9-5": "Maulid Nabi Muhammad SAW", "12-25": "Hari Raya Natal"
         };
+
+        const SITES = ["Office Adaro 73", "Kelanis", "Dahai", "Induksi", "Field Office"];
 
         function FlyerKopkrindo() {
             const [view, setView] = useState('flyer');
             const [name, setName] = useState('');
             const [nik, setNik] = useState('');
             const [kopkarId, setKopkarId] = useState('');
+            const [siteLocation, setSiteLocation] = useState(''); // New State for Site
             
+            // History State
+            const [history, setHistory] = useState([]);
+
             // Planner State
             const [destination, setDestination] = useState('');
             const [days, setDays] = useState('');
@@ -136,9 +135,9 @@
             const [bookingDetails, setBookingDetails] = useState('');
             const [calcAmount, setCalcAmount] = useState('');
 
-            // Calendar State
             const [currentDate, setCurrentDate] = useState(new Date());
 
+            // Load Data & History
             useEffect(() => {
                 const savedData = localStorage.getItem('kopkar_user_data');
                 if (savedData) {
@@ -146,13 +145,42 @@
                     if (parsed.name) setName(parsed.name);
                     if (parsed.nik) setNik(parsed.nik);
                     if (parsed.kopkarId) setKopkarId(parsed.kopkarId);
+                    if (parsed.siteLocation) setSiteLocation(parsed.siteLocation);
+                }
+                const savedHistory = localStorage.getItem('kopkar_history');
+                if (savedHistory) {
+                    setHistory(JSON.parse(savedHistory));
                 }
             }, []);
 
+            // Save User Data
             useEffect(() => {
-                const userData = { name, nik, kopkarId };
+                const userData = { name, nik, kopkarId, siteLocation };
                 localStorage.setItem('kopkar_user_data', JSON.stringify(userData));
-            }, [name, nik, kopkarId]);
+            }, [name, nik, kopkarId, siteLocation]);
+
+            // Save History
+            const saveToHistory = (type, details, amount = '-') => {
+                const newItem = {
+                    id: Date.now(),
+                    date: new Date().toLocaleDateString('id-ID'),
+                    type,
+                    details,
+                    amount
+                };
+                const newHistory = [newItem, ...history];
+                setHistory(newHistory);
+                localStorage.setItem('kopkar_history', JSON.stringify(newHistory));
+            };
+
+            const clearUserData = () => {
+                if(confirm("Hapus semua data tersimpan dan riwayat?")) {
+                    localStorage.removeItem('kopkar_user_data');
+                    localStorage.removeItem('kopkar_history');
+                    setName(''); setNik(''); setKopkarId(''); setSiteLocation(''); setHistory([]);
+                    alert("Data berhasil dihapus.");
+                }
+            };
 
             const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
 
@@ -170,10 +198,9 @@
 
             const handleDateClick = (day, month, year, holidayName) => {
                 if (holidayName) {
-                    // Jika klik tanggal merah, tawarkan paket
                     if (confirm(`📅 ${holidayName}\n\nIni tanggal merah! Mau rencanakan liburan untuk tanggal ini?`)) {
                         setDestination(`Liburan ${holidayName}`);
-                        setDays('3'); // Default 3 hari
+                        setDays('3'); 
                         setView('planner');
                     }
                 }
@@ -183,62 +210,29 @@
                 const { days, firstDay, year, month } = getDaysInMonth(currentDate);
                 const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
                 const dayNames = ["M", "S", "S", "R", "K", "J", "S"];
-                
                 let calendarDays = [];
-                // Empty slots for prev month
-                for (let i = 0; i < firstDay; i++) {
-                    calendarDays.push(<div key={`empty-${i}`} className="h-8"></div>);
-                }
-                
-                // Days
+                for (let i = 0; i < firstDay; i++) calendarDays.push(<div key={`empty-${i}`} className="h-8"></div>);
                 for (let d = 1; d <= days; d++) {
                     const dateKey = `${month + 1}-${d}`;
                     const isHoliday = HOLIDAYS_2025[dateKey];
                     const isToday = new Date().getDate() === d && new Date().getMonth() === month && new Date().getFullYear() === year;
-                    
                     calendarDays.push(
-                        <div 
-                            key={d} 
-                            onClick={() => handleDateClick(d, month, year, isHoliday)}
-                            className={`h-8 flex items-center justify-center text-xs rounded-full cursor-pointer transition-all
-                                ${isHoliday ? 'bg-red-100 text-red-600 font-bold hover:bg-red-200 ring-1 ring-red-300' : ''}
-                                ${isToday ? 'bg-blue-600 text-white font-bold' : 'text-gray-700 hover:bg-gray-100'}
-                            `}
-                            title={isHoliday || ''}
-                        >
+                        <div key={d} onClick={() => handleDateClick(d, month, year, isHoliday)}
+                            className={`h-8 flex items-center justify-center text-xs rounded-full cursor-pointer transition-all ${isHoliday ? 'bg-red-100 text-red-600 font-bold hover:bg-red-200 ring-1 ring-red-300' : ''} ${isToday ? 'bg-blue-600 text-white font-bold' : 'text-gray-700 hover:bg-gray-100'}`} title={isHoliday || ''}>
                             {d}
                         </div>
                     );
                 }
-
                 return (
                     <div className="bg-white rounded-lg border border-slate-200 p-3 shadow-sm mb-3">
                         <div className="flex justify-between items-center mb-2">
                             <button onClick={handlePrevMonth} className="p-1 hover:bg-slate-100 rounded"><ChevronLeft size={16} className="text-slate-500"/></button>
-                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                                <CalendarIcon size={14} className="text-blue-500"/> {monthNames[month]} {year}
-                            </span>
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1"><CalendarIcon size={14} className="text-blue-500"/> {monthNames[month]} {year}</span>
                             <button onClick={handleNextMonth} className="p-1 hover:bg-slate-100 rounded"><ChevronRight size={16} className="text-slate-500"/></button>
                         </div>
-                        
-                        {/* Grid Header */}
-                        <div className="grid grid-cols-7 gap-1 mb-1 text-center">
-                            {dayNames.map((dn, idx) => (
-                                <div key={idx} className={`text-[10px] font-bold ${idx===0 ? 'text-red-500':'text-slate-400'}`}>{dn}</div>
-                            ))}
-                        </div>
-                        
-                        {/* Grid Days */}
-                        <div className="grid grid-cols-7 gap-1 text-center">
-                            {calendarDays}
-                        </div>
-
-                        {/* Holiday Legend */}
-                        <div className="mt-2 pt-2 border-t border-dashed border-slate-200">
-                            <p className="text-[9px] text-slate-500 text-center italic">
-                                *Klik tanggal <span className="text-red-500 font-bold">MERAH</span> untuk merencanakan liburan!
-                            </p>
-                        </div>
+                        <div className="grid grid-cols-7 gap-1 mb-1 text-center">{dayNames.map((dn, idx) => (<div key={idx} className={`text-[10px] font-bold ${idx===0 ? 'text-red-500':'text-slate-400'}`}>{dn}</div>))}</div>
+                        <div className="grid grid-cols-7 gap-1 text-center">{calendarDays}</div>
+                        <div className="mt-2 pt-2 border-t border-dashed border-slate-200"><p className="text-[9px] text-slate-500 text-center italic">*Klik tanggal <span className="text-red-500 font-bold">MERAH</span> untuk merencanakan liburan!</p></div>
                     </div>
                 );
             };
@@ -247,23 +241,18 @@
             const generateOfflineItinerary = () => {
                 const dur = parseInt(days);
                 const dest = destination || "Destinasi Populer";
-                let flightCost = 2000000; 
-                let dailyCost = 500000;   
-                
+                let flightCost = 2000000; let dailyCost = 500000;
                 if (budget === 'Hemat') { dailyCost = 350000; flightCost = 1500000; }
                 if (budget === 'Mewah') { dailyCost = 1500000; flightCost = 3000000; }
-                
                 const lowerDest = dest.toLowerCase();
                 if (lowerDest.includes('banjar') || lowerDest.includes('kalsel')) flightCost = 500000; 
                 if (lowerDest.includes('jakarta') || lowerDest.includes('surabaya')) flightCost = 1800000;
                 if (lowerDest.includes('bali') || lowerDest.includes('lombok')) flightCost = 2500000;
-
                 const totalBiayaMurni = flightCost + (dailyCost * dur);
                 const feeJasa = totalBiayaMurni * 0.05;
                 const totalPinjaman = totalBiayaMurni + feeJasa;
                 const tenor = totalPinjaman <= 10000000 ? 12 : 24;
                 const angsuran = totalPinjaman / tenor;
-
                 return `**ESTIMASI SISTEM (LOGIKA CERDAS):**\n\n1. **Tujuan**: ${dest} (${dur} Hari - ${budget})\n2. **Gambaran Biaya**:\n   - Transportasi (PP): ± ${formatRupiah(flightCost)}\n   - Akomodasi & Saku: ± ${formatRupiah(dailyCost)} x ${dur} hari\n   -----------------------------------\n   **Estimasi Total: ${formatRupiah(totalBiayaMurni)}**\n\n3. **SIMULASI KOPKARINDO**:\n   - Jasa Fee (5%): ${formatRupiah(feeJasa)}\n   - Total Pinjaman: ${formatRupiah(totalPinjaman)}\n   - Tenor: ${tenor} Bulan\n   👉 **Angsuran: ${formatRupiah(angsuran)} /bulan**\n\n*Catatan: Ini adalah hitungan otomatis sistem.*`;
             };
 
@@ -286,10 +275,26 @@
                 } catch (error) { setResult(generateOfflineItinerary()); } finally { setLoading(false); }
             };
 
-            const sendTravelToWA = () => { if (!name || !nik) { alert("Lengkapi Nama/NIK."); return; } window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Pinjaman Wisata:\nNama: ${name}\nNIK: ${nik}\n\n${result}`)}`, '_blank'); };
-            const sendBillToWA = () => { if (!name || !nik || !billNumber) { alert("Lengkapi Data."); return; } window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Bayar Tagihan:\nNama: ${name}\nNIK: ${nik}\nJenis: ${billType}\nNomor: ${billNumber}`)}`, '_blank'); };
-            const sendBookingToWA = () => { if (!name || !nik || !bookingDetails) { alert("Lengkapi Data."); return; } window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Pesan Tiket:\nNama: ${name}\nNIK: ${nik}\nDetail: ${bookingDetails}`)}`, '_blank'); };
-            const sendCalcToWA = (p, f, t, ten, inst) => { if (!name || !nik) { alert("Lengkapi Nama/NIK."); return; } window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Simulasi Pinjaman:\nNama: ${name}\nNIK: ${nik}\nDana: ${formatRupiah(p)}\nTotal: ${formatRupiah(t)}\nAngsuran: ${formatRupiah(inst)} x ${ten} bulan`)}`, '_blank'); }
+            const sendTravelToWA = () => { 
+                if (!name || !nik) { alert("Lengkapi Nama/NIK."); return; } 
+                saveToHistory('Travel Planner', `${destination} (${days} Hari)`, 'Estimasi');
+                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Pinjaman Wisata:\nNama: ${name}\nNIK: ${nik}\nNo Anggota: ${kopkarId || '-'}\nLokasi: ${siteLocation || '-'}\n\n${result}`)}`, '_blank'); 
+            };
+            const sendBillToWA = () => { 
+                if (!name || !nik || !billNumber) { alert("Lengkapi Data."); return; } 
+                saveToHistory('PPOB', `${billType}: ${billNumber}`, '-');
+                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Bayar Tagihan:\nNama: ${name}\nNIK: ${nik}\nLokasi: ${siteLocation || '-'}\nJenis: ${billType}\nNomor: ${billNumber}`)}`, '_blank'); 
+            };
+            const sendBookingToWA = () => { 
+                if (!name || !nik || !bookingDetails) { alert("Lengkapi Data."); return; } 
+                saveToHistory('Booking', `${bookingType}`, 'Sesuai Tagihan');
+                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Pesan Tiket:\nNama: ${name}\nNIK: ${nik}\nLokasi: ${siteLocation || '-'}\nDetail: ${bookingDetails}`)}`, '_blank'); 
+            };
+            const sendCalcToWA = (p, f, t, ten, inst) => { 
+                if (!name || !nik) { alert("Lengkapi Nama/NIK."); return; } 
+                saveToHistory('Simulasi', `Pinjaman Tunai`, formatRupiah(t));
+                window.open(`https://wa.me/6285248626532?text=${encodeURIComponent(`Halo Admin, Simulasi Pinjaman:\nNama: ${name}\nNIK: ${nik}\nLokasi: ${siteLocation || '-'}\nDana: ${formatRupiah(p)}\nTotal: ${formatRupiah(t)}\nAngsuran: ${formatRupiah(inst)} x ${ten} bulan`)}`, '_blank'); 
+            }
 
             return (
                 <div className="flex flex-col items-center min-h-screen w-full p-4 relative overflow-hidden">
@@ -308,7 +313,6 @@
                                 </div>
 
                                 <div className="p-4 bg-white/80 backdrop-blur-sm flex-1 relative z-10">
-                                    {/* KALENDER FITUR BARU */}
                                     {renderCalendar()}
 
                                     <div className="grid grid-cols-1 gap-3">
@@ -323,6 +327,16 @@
                                         <div onClick={() => setView('calculator')} className="flex items-center p-2 bg-amber-50/90 rounded-lg border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors group shadow-sm">
                                             <div className="bg-amber-100 p-2 rounded-full mr-3 group-hover:bg-white"><Calculator size={18} className="text-amber-600" /></div>
                                             <div className="text-xs flex-1"><span className="font-bold text-gray-800 block flex justify-between">Simulasi Cicilan <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Mandiri</span></span><span className="text-gray-500">Hitung angsuran pinjaman</span></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div onClick={() => setView('card')} className="flex items-center p-2 bg-blue-50/90 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors group shadow-sm">
+                                                <div className="bg-blue-100 p-2 rounded-full mr-2 group-hover:bg-white"><IdCard size={16} className="text-blue-600" /></div>
+                                                <div className="text-xs font-bold text-gray-800">Kartu Anggota</div>
+                                            </div>
+                                            <div onClick={() => setView('history')} className="flex items-center p-2 bg-slate-100 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors group shadow-sm">
+                                                <div className="bg-slate-200 p-2 rounded-full mr-2 group-hover:bg-white"><HistoryIcon size={16} className="text-slate-600" /></div>
+                                                <div className="text-xs font-bold text-gray-800">Riwayat Saya</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -342,6 +356,108 @@
                             </div>
                         )}
 
+                        {/* VIEW: DIGITAL CARD */}
+                        {view === 'card' && (
+                            <div className="flex-1 flex flex-col bg-slate-50/95 h-full animate-fadeIn relative z-10">
+                                <div className="bg-blue-800 p-4 text-white flex items-center shadow-md">
+                                    <button onClick={() => setView('flyer')} className="mr-3 hover:bg-blue-700 p-1 rounded-full"><ArrowLeft size={20} /></button>
+                                    <div className="flex-1"><h2 className="font-bold text-sm">Kartu Anggota Digital</h2></div>
+                                </div>
+                                <div className="p-6 flex flex-col items-center justify-center flex-1">
+                                    {/* CARD DESIGN */}
+                                    <div className="w-full bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 rounded-2xl shadow-2xl p-6 text-white relative overflow-hidden aspect-[1.58/1]">
+                                        <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/3"></div>
+                                        <div className="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-5 rounded-full translate-y-1/3 -translate-x-1/3"></div>
+                                        <div className="card-shine absolute inset-0"></div>
+                                        
+                                        <div className="relative z-10 h-full flex flex-col justify-between">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-2">
+                                                    <img src="https://i.ibb.co.com/8Df6kd0M/Untitled-design-1.png" alt="Logo" className="w-10 h-auto brightness-200"/>
+                                                    <div>
+                                                        <div className="text-[8px] opacity-70 tracking-widest uppercase">Koperasi Karyawan</div>
+                                                        <div className="text-xs font-bold tracking-wide">KOPKARINDO</div>
+                                                    </div>
+                                                </div>
+                                                <QrCode size={32} className="opacity-80" />
+                                            </div>
+                                            
+                                            <div className="mt-4">
+                                                <div className="text-[10px] opacity-70 uppercase mb-1">Nama Anggota</div>
+                                                <div className="text-lg font-bold tracking-wide truncate">{name || 'NAMA ANGGOTA'}</div>
+                                                {siteLocation && <div className="text-[10px] opacity-80 mt-1 flex items-center gap-1"><MapPin size={10}/> {siteLocation}</div>}
+                                            </div>
+
+                                            <div className="flex justify-between items-end mt-2">
+                                                <div>
+                                                    <div className="text-[8px] opacity-70 uppercase">Nomor Anggota</div>
+                                                    <div className="text-sm font-mono tracking-wider">{kopkarId || '000-000-000'}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-[8px] opacity-70 uppercase">NIK</div>
+                                                    <div className="text-sm font-mono">{nik || '---'}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-center text-xs text-gray-500 mt-6 max-w-xs">
+                                        Tunjukkan kartu digital ini untuk verifikasi keanggotaan atau klaim promo khusus di mitra Kopkarindo.
+                                    </p>
+                                    <button onClick={() => setView('history')} className="mt-8 text-blue-600 text-xs font-bold flex items-center gap-1 hover:underline">
+                                        <User size={14}/> Ubah Data Profil
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* VIEW 6: HISTORY & SETTINGS */}
+                        {view === 'history' && (
+                            <div className="flex-1 flex flex-col bg-slate-50/95 h-full animate-fadeIn relative z-10">
+                                <div className="bg-slate-700 p-4 text-white flex items-center shadow-md">
+                                    <button onClick={() => setView('flyer')} className="mr-3 hover:bg-slate-600 p-1 rounded-full"><ArrowLeft size={20} /></button>
+                                    <div className="flex-1"><h2 className="font-bold text-sm">Riwayat & Pengaturan</h2><p className="text-[10px] text-slate-300">Catatan aktivitas lokal Anda</p></div>
+                                    <button onClick={clearUserData} className="p-2 bg-red-500 hover:bg-red-600 rounded-lg text-xs flex items-center gap-1 shadow"><Trash2 size={14}/> Reset</button>
+                                </div>
+                                <div className="p-4 space-y-3 overflow-y-auto">
+                                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                                        <div className="flex items-center gap-2 text-slate-800 mb-2 pb-2 border-b border-slate-100">
+                                            <User size={14} /><h3 className="text-xs font-bold">Data Tersimpan</h3>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <input type="text" placeholder="Nama Lengkap" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none bg-gray-50" />
+                                            <div className="flex gap-2">
+                                                <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none bg-gray-50" />
+                                                <input type="text" placeholder="No. Anggota" value={kopkarId} onChange={(e) => setKopkarId(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none bg-gray-50" />
+                                            </div>
+                                            <select value={siteLocation} onChange={(e) => setSiteLocation(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none bg-gray-50">
+                                                <option value="">Pilih Lokasi Kerja...</option>
+                                                {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                            <p className="text-[9px] text-gray-400 italic text-right">*Data tersimpan otomatis di HP ini</p>
+                                        </div>
+                                    </div>
+
+                                    <h3 className="text-xs font-bold text-slate-500 mt-2">Aktivitas Terakhir</h3>
+                                    {history.length === 0 ? (
+                                        <div className="text-center py-8 text-gray-400 text-xs italic">Belum ada riwayat pengajuan.</div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {history.map((item) => (
+                                                <div key={item.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex justify-between items-center">
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-400 mb-1">{item.date} • {item.type}</div>
+                                                        <div className="text-xs font-bold text-slate-800">{item.details}</div>
+                                                    </div>
+                                                    <div className="text-xs font-bold text-blue-600">{item.amount}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* VIEW 2: AI PLANNER */}
                         {view === 'planner' && (
                             <div className="flex-1 flex flex-col bg-gray-50/95 h-full animate-fadeIn relative z-10">
@@ -357,6 +473,10 @@
                                             <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none" />
                                             <input type="text" placeholder="No. Anggota" value={kopkarId} onChange={(e) => setKopkarId(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none" />
                                         </div>
+                                        <select value={siteLocation} onChange={(e) => setSiteLocation(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none bg-white">
+                                            <option value="">Pilih Lokasi Kerja...</option>
+                                            {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
                                     </div>
                                     <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm space-y-2">
                                         <div className="flex items-center gap-2 text-gray-700 mb-1"><MapPin size={14} /><h3 className="text-xs font-bold">Rencana Liburan</h3></div>
@@ -394,7 +514,14 @@
                                     <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-sm space-y-2">
                                         <div className="flex items-center gap-2 text-indigo-800 mb-1"><User size={14} /><h3 className="text-xs font-bold">Data Pemesan</h3></div>
                                         <input type="text" placeholder="Nama Lengkap" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
-                                        <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
+                                        <div className="flex gap-2">
+                                            <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none" />
+                                            <input type="text" placeholder="No. Anggota" value={kopkarId} onChange={(e) => setKopkarId(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none" />
+                                        </div>
+                                        <select value={siteLocation} onChange={(e) => setSiteLocation(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none bg-white">
+                                            <option value="">Pilih Lokasi Kerja...</option>
+                                            {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
                                     </div>
                                     <div className="bg-white p-3 rounded-lg border border-indigo-200 shadow-sm space-y-3">
                                         <div className="flex items-center gap-2 text-indigo-800 mb-1"><Ticket size={14} /><h3 className="text-xs font-bold">Detail Pesanan</h3></div>
@@ -421,7 +548,14 @@
                                     <div className="bg-white p-3 rounded-lg border border-green-200 shadow-sm space-y-2">
                                         <div className="flex items-center gap-2 text-green-800 mb-1"><User size={14} /><h3 className="text-xs font-bold">Data Karyawan</h3></div>
                                         <input type="text" placeholder="Nama Lengkap" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
-                                        <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
+                                        <div className="flex gap-2">
+                                            <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none" />
+                                            <input type="text" placeholder="No. Anggota" value={kopkarId} onChange={(e) => setKopkarId(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none" />
+                                        </div>
+                                        <select value={siteLocation} onChange={(e) => setSiteLocation(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none bg-white">
+                                            <option value="">Pilih Lokasi Kerja...</option>
+                                            {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
                                     </div>
                                     <div className="bg-white p-3 rounded-lg border border-green-200 shadow-sm space-y-3">
                                         <div className="flex items-center gap-2 text-green-800 mb-1"><Zap size={14} /><h3 className="text-xs font-bold">Jenis Tagihan</h3></div>
@@ -448,7 +582,14 @@
                                     <div className="bg-white p-3 rounded-lg border border-amber-200 shadow-sm space-y-2">
                                         <div className="flex items-center gap-2 text-amber-800 mb-1"><User size={14} /><h3 className="text-xs font-bold">Data Karyawan</h3></div>
                                         <input type="text" placeholder="Nama Lengkap" value={name} onChange={(e) => setName(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
-                                        <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none" />
+                                        <div className="flex gap-2">
+                                            <input type="text" placeholder="NIK" value={nik} onChange={(e) => setNik(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none" />
+                                            <input type="text" placeholder="No. Anggota" value={kopkarId} onChange={(e) => setKopkarId(e.target.value)} className="flex-1 p-2 text-xs border border-gray-300 rounded outline-none" />
+                                        </div>
+                                        <select value={siteLocation} onChange={(e) => setSiteLocation(e.target.value)} className="w-full p-2 text-xs border border-gray-300 rounded outline-none bg-white">
+                                            <option value="">Pilih Lokasi Kerja...</option>
+                                            {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
                                     </div>
                                     <div className="bg-white p-4 rounded-lg border border-amber-200 shadow-sm space-y-3">
                                         <div className="flex items-center gap-2 text-amber-800 mb-1"><Wallet size={14} /><h3 className="text-xs font-bold">Berapa Dana Yang Dibutuhkan?</h3></div>
