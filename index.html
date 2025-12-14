@@ -79,7 +79,8 @@
         const Trash2 = (p) => <Icon name="trash-2" {...p} />;
         const IdCard = (p) => <Icon name="id-card" {...p} />;
         const QrCode = (p) => <Icon name="qr-code" {...p} />;
-        const Building = (p) => <Icon name="building-2" {...p} />;
+        const ShoppingCart = (p) => <Icon name="shopping-cart" {...p} />;
+        const RefreshCw = (p) => <Icon name="refresh-cw" {...p} />;
 
         const BackgroundDecor = memo(() => (
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -110,13 +111,20 @@
         };
 
         const SITES = ["Office Adaro 73", "Kelanis", "Dahai", "Induksi", "Field Office"];
+        
+        // API URL untuk Voucher
+        const API_URL = "https://script.google.com/macros/s/AKfycbyQFkZW0QuBXi082jgXTsVBIy1OfVfhaQYVogvr7uBJBrCuGtkM73tTGqA1dl9ThlfL/exec";
 
         function FlyerKopkrindo() {
             const [view, setView] = useState('flyer');
             const [name, setName] = useState('');
             const [nik, setNik] = useState('');
             const [kopkarId, setKopkarId] = useState('');
-            const [siteLocation, setSiteLocation] = useState(''); // New State for Site
+            const [siteLocation, setSiteLocation] = useState('');
+            
+            // Voucher State
+            const [voucherData, setVoucherData] = useState(null);
+            const [loadingVoucher, setLoadingVoucher] = useState(false);
             
             // History State
             const [history, setHistory] = useState([]);
@@ -178,11 +186,62 @@
                     localStorage.removeItem('kopkar_user_data');
                     localStorage.removeItem('kopkar_history');
                     setName(''); setNik(''); setKopkarId(''); setSiteLocation(''); setHistory([]);
+                    setVoucherData(null);
                     alert("Data berhasil dihapus.");
                 }
             };
 
             const formatRupiah = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
+
+            // --- VOUCHER LOGIC ---
+            const getPeriodFromDate = (dateStr) => {
+                const d = new Date(dateStr);
+                return `${d.getMonth() + 1}-${d.getFullYear()}`;
+            };
+
+            const fetchVoucher = async () => {
+                if (!nik) {
+                    if (view === 'voucher') alert("Mohon lengkapi NIK di menu Riwayat/Setting dulu.");
+                    return;
+                }
+                setLoadingVoucher(true);
+                const period = getPeriodFromDate(new Date());
+                try {
+                    // Fetch data dari Google Script
+                    const response = await fetch(`${API_URL}?periode=${period}`);
+                    const data = await response.json();
+                    
+                    if (Array.isArray(data)) {
+                        // Cari user berdasarkan NIK atau No Anggota
+                        const targetId = String(nik).toUpperCase().replace(/\s+/g, '').trim();
+                        const found = data.find(u => {
+                            const uNik = String(u.nik || '').toUpperCase().replace(/\s+/g, '').trim();
+                            const uNo = String(u.noAnggota || '').toUpperCase().replace(/\s+/g, '').trim();
+                            return uNik === targetId || (kopkarId && uNo === String(kopkarId).trim());
+                        });
+
+                        if (found) {
+                            setVoucherData(found);
+                        } else if (view === 'voucher') {
+                            alert("Data Voucher tidak ditemukan untuk NIK ini.");
+                            setVoucherData(null);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Gagal ambil voucher", error);
+                    if (view === 'voucher') alert("Gagal mengambil data voucher. Periksa internet.");
+                } finally {
+                    setLoadingVoucher(false);
+                }
+            };
+
+            // Auto fetch voucher when opening card or voucher view
+            useEffect(() => {
+                if ((view === 'card' || view === 'voucher') && nik) {
+                    fetchVoucher();
+                }
+            }, [view, nik]);
+
 
             // --- Calendar Logic ---
             const getDaysInMonth = (date) => {
@@ -324,6 +383,12 @@
                                             <div className="bg-green-100 p-2 rounded-full mr-3 group-hover:bg-white"><Zap size={18} className="text-green-600" /></div>
                                             <div className="text-xs flex-1"><span className="font-bold text-gray-800 block flex justify-between">Bayar Tagihan <span className="bg-green-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">PPOB</span></span><span className="text-gray-500">Listrik, Air, Pulsa (Jasa 1.5%)</span></div>
                                         </div>
+                                        {/* NEW MENU: VOUCHER BELANJA */}
+                                        <div onClick={() => setView('voucher')} className="flex items-center p-2 bg-pink-50/90 rounded-lg border border-pink-100 cursor-pointer hover:bg-pink-100 transition-colors group shadow-sm">
+                                            <div className="bg-pink-100 p-2 rounded-full mr-3 group-hover:bg-white"><ShoppingCart size={18} className="text-pink-600" /></div>
+                                            <div className="text-xs flex-1"><span className="font-bold text-gray-800 block flex justify-between">Voucher Belanja <span className="bg-pink-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Cek Limit</span></span><span className="text-gray-500">Adamart 73, Induksi, Kelanis</span></div>
+                                        </div>
+                                        
                                         <div onClick={() => setView('calculator')} className="flex items-center p-2 bg-amber-50/90 rounded-lg border border-amber-100 cursor-pointer hover:bg-amber-100 transition-colors group shadow-sm">
                                             <div className="bg-amber-100 p-2 rounded-full mr-3 group-hover:bg-white"><Calculator size={18} className="text-amber-600" /></div>
                                             <div className="text-xs flex-1"><span className="font-bold text-gray-800 block flex justify-between">Simulasi Cicilan <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded-full text-[9px]">Mandiri</span></span><span className="text-gray-500">Hitung angsuran pinjaman</span></div>
@@ -379,7 +444,14 @@
                                                         <div className="text-xs font-bold tracking-wide">KOPKARINDO</div>
                                                     </div>
                                                 </div>
-                                                <QrCode size={32} className="opacity-80" />
+                                                {/* QR Code NIK untuk Scan Kasir */}
+                                                <div className="bg-white p-1 rounded">
+                                                    <img 
+                                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${nik || 'INVALID'}`} 
+                                                        alt="QR" 
+                                                        className="w-10 h-10"
+                                                    />
+                                                </div>
                                             </div>
                                             
                                             <div className="mt-4">
@@ -390,8 +462,10 @@
 
                                             <div className="flex justify-between items-end mt-2">
                                                 <div>
-                                                    <div className="text-[8px] opacity-70 uppercase">Nomor Anggota</div>
-                                                    <div className="text-sm font-mono tracking-wider">{kopkarId || '000-000-000'}</div>
+                                                    <div className="text-[8px] opacity-70 uppercase">Saldo Voucher</div>
+                                                    <div className="text-sm font-mono tracking-wider font-bold text-yellow-300">
+                                                        {loadingVoucher ? 'Loading...' : (voucherData ? `Rp ${(voucherData.limit - (voucherData.used||0)).toLocaleString('id-ID')}` : 'Rp -')}
+                                                    </div>
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="text-[8px] opacity-70 uppercase">NIK</div>
@@ -407,6 +481,64 @@
                                     <button onClick={() => setView('history')} className="mt-8 text-blue-600 text-xs font-bold flex items-center gap-1 hover:underline">
                                         <User size={14}/> Ubah Data Profil
                                     </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* VIEW: VOUCHER BELANJA (NEW) */}
+                        {view === 'voucher' && (
+                            <div className="flex-1 flex flex-col bg-pink-50/95 h-full animate-fadeIn relative z-10">
+                                <div className="bg-pink-700 p-4 text-white flex items-center shadow-md">
+                                    <button onClick={() => setView('flyer')} className="mr-3 hover:bg-pink-600 p-1 rounded-full"><ArrowLeft size={20} /></button>
+                                    <div className="flex-1"><h2 className="font-bold text-sm">Voucher Belanja</h2><p className="text-[10px] text-pink-200">Adamart 73 • Induksi • Kelanis</p></div>
+                                    <button onClick={fetchVoucher} className="p-2 hover:bg-pink-600 rounded-full"><RefreshCw size={16} className={loadingVoucher ? 'animate-spin' : ''}/></button>
+                                </div>
+                                <div className="p-6 overflow-y-auto">
+                                    {/* Voucher Card */}
+                                    <div className="bg-white rounded-2xl shadow-xl border border-pink-100 overflow-hidden mb-4">
+                                        <div className="bg-pink-600 p-4 text-white flex justify-between items-center">
+                                            <span className="text-xs font-bold tracking-widest uppercase opacity-80">E-VOUCHER</span>
+                                            <div className="bg-white/20 p-1.5 rounded-lg"><ShoppingCart size={16}/></div>
+                                        </div>
+                                        <div className="p-6 text-center">
+                                            <p className="text-xs text-gray-500 uppercase tracking-wide">Sisa Saldo Anda</p>
+                                            {loadingVoucher ? (
+                                                <div className="py-4"><Loader2 className="w-8 h-8 text-pink-500 animate-spin mx-auto"/></div>
+                                            ) : voucherData ? (
+                                                <>
+                                                    <h1 className="text-3xl font-black text-slate-800 mt-2 mb-1">Rp {(voucherData.limit - (voucherData.used || 0)).toLocaleString('id-ID')}</h1>
+                                                    <div className="flex justify-center gap-4 text-[10px] text-gray-500 mt-2">
+                                                        <span>Limit: {voucherData.limit.toLocaleString()}</span>
+                                                        <span>Terpakai: {(voucherData.used || 0).toLocaleString()}</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="py-4 text-sm text-red-500">Data tidak ditemukan. Pastikan NIK di menu setting benar.</div>
+                                            )}
+                                        </div>
+                                        
+                                        {/* QR Area */}
+                                        <div className="bg-slate-50 p-4 border-t border-dashed border-slate-200 flex flex-col items-center">
+                                            <div className="bg-white p-2 rounded-lg border border-slate-200 mb-2">
+                                                <img 
+                                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${nik || 'INVALID'}`} 
+                                                    alt="QR NIK" 
+                                                    className="w-32 h-32"
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-gray-500 font-bold">NIK: {nik}</p>
+                                            <p className="text-[10px] text-pink-600 mt-2 text-center max-w-[200px]">Tunjukkan QR Code ini kepada kasir sebagai bukti kepemilikan voucher.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-pink-100 p-3 rounded-lg border border-pink-200 text-xs text-pink-800">
+                                        <p className="font-bold mb-1 flex items-center gap-1"><AlertCircle size={12}/> Syarat & Ketentuan</p>
+                                        <ul className="list-disc pl-4 space-y-1 opacity-80 text-[10px]">
+                                            <li>Voucher berlaku di Adamart 73, Induksi, dan Kelanis.</li>
+                                            <li>Pastikan sisa saldo mencukupi sebelum transaksi.</li>
+                                            <li>Transaksi akan dipotong gaji bulan berjalan.</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         )}
